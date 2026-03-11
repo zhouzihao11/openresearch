@@ -21,14 +21,14 @@
 
 ### P1 - 尽量包含
 
-| 功能     | 描述                           |
-| -------- | ------------------------------ |
-| 代码项目 | 添加本地代码目录，实验引用代码 |
+| 功能       | 描述                           |
+| ---------- | ------------------------------ |
+| 代码项目   | 添加本地代码目录，实验引用代码 |
+| 远程服务器 | SSH 远程执行实验               |
 
 ### 不包含（后续阶段）
 
 - 文献管理
-- 远程服务器
 - 课题级 AI 对话
 - 批量导入
 - 里程碑管理
@@ -106,6 +106,19 @@ export const codeProjects = sqliteTable("research_code_projects", {
 })
 ```
 
+### 6. 服务器表 (servers) - P1
+
+```typescript
+export const servers = sqliteTable("research_servers", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // 'ssh' | 'docker'
+  endpoint: text("endpoint").notNull(),
+  credentialsJson: text("credentials_json").notNull(),
+  resourcesJson: text("resources_json").notNull(),
+})
+```
+
 ---
 
 ## 实施计划
@@ -136,7 +149,14 @@ export const codeProjects = sqliteTable("research_code_projects", {
 - [ ] 捕获输出和指标
 - [ ] 结果归档
 
-### Step 5: 集成测试 (1周)
+### Step 5: 远程服务器 - P1 (1周)
+
+- [ ] 服务器配置管理
+- [ ] SSH 连接池
+- [ ] 远程执行实验
+- [ ] 结果回传
+
+### Step 6: 集成测试 (1周)
 
 - [ ] 完整工作流测试
 - [ ] Bug 修复
@@ -169,6 +189,10 @@ research rel add <src> <tgt> <type>  # 添加关系
 
 # 实验
 research validate <atom-id>      # 执行验证
+
+# 服务器 - P1
+research server add <name> <endpoint>  # 添加服务器
+research server list              # 列出服务器
 ```
 
 ### 3. 数据存储
@@ -179,14 +203,15 @@ research validate <atom-id>      # 执行验证
 
 ## 预估时间
 
-| 阶段       | 时间    |
-| ---------- | ------- |
-| 基础架构   | 1周     |
-| 原子系统   | 1周     |
-| 图谱可视化 | 1周     |
-| 实验执行   | 1周     |
-| 集成测试   | 1周     |
-| **总计**   | **5周** |
+| 阶段            | 时间    |
+| --------------- | ------- |
+| 基础架构        | 1周     |
+| 原子系统        | 1周     |
+| 图谱可视化      | 1周     |
+| 实验执行        | 1周     |
+| 远程服务器 - P1 | 1周     |
+| 集成测试        | 1周     |
+| **总计**        | **6周** |
 
 ---
 
@@ -194,12 +219,11 @@ research validate <atom-id>      # 执行验证
 
 ### 第二阶段
 
-- 远程服务器支持
 - 文献管理模块
 - 批量导入功能
+- 课题级 AI 对话
 
 ### 第三阶段
 
-- 课题级 AI 对话
 - 里程碑管理
 - 团队协作
