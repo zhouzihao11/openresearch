@@ -121,21 +121,78 @@ export const servers = sqliteTable("research_servers", {
 
 ---
 
+## 目录结构
+
+### 服务端 (packages/opencode/src/research/)
+
+```
+packages/opencode/src/
+└── research/
+    ├── index.ts                  # 模块入口
+    ├── research.sql.ts          # Drizzle Schema
+    ├── routes/
+    │   ├── project.ts           # 课题 API
+    │   ├── atom.ts              # 原子 API
+    │   ├── experiment.ts        # 实验 API
+    │   └── server.ts            # 服务器 API
+    ├── storage/
+    │   └── index.ts             # 数据库操作
+    └── services/
+        └── experiment.ts        # 实验执行服务
+```
+
+### Web UI (packages/app/src/pages/research/)
+
+```
+packages/app/src/
+└── pages/
+    └── research/
+        ├── index.tsx             # 课题列表页
+        ├── project.tsx           # 课题总览（4栏布局）
+        ├── atom.tsx              # 原子编辑页
+        └── graph.tsx             # 知识图谱页
+```
+
+---
+
 ## 实施计划
 
 ### Step 1: 项目基础架构 (1周)
 
+**服务端**：
+
 - [ ] 在 `packages/opencode/src/research/` 创建目录结构
 - [ ] 配置 Drizzle + SQLite
-- [ ] 实现课题的 CRUD
+- [ ] 创建数据库表 (projects)
+- [ ] 实现课题 CRUD API
+
+**前端**：
+
+- [ ] 在 `packages/app/src/pages/research/` 创建目录结构
+- [ ] 添加科研页面路由
 
 ### Step 2: 原子系统 (1周)
 
-- [ ] 实现原子的 CRUD
-- [ ] 实现原子关系的 CRUD
-- [ ] 实现依赖检查（验证前检查前置条件）
+**服务端**：
+
+- [ ] 创建 atoms, atomRelations 表
+- [ ] 实现原子 CRUD API
+- [ ] 实现原子关系 CRUD API
+- [ ] 实现依赖检查
+
+**前端**：
+
+- [ ] 原子列表页面
+- [ ] 原子创建/编辑页面
+- [ ] 关系管理界面
 
 ### Step 3: 图谱可视化 (1周)
+
+**服务端**：
+
+- [ ] 提供图谱数据 API
+
+**前端**：
 
 - [ ] 集成 React Flow
 - [ ] 渲染原子节点（按类型区分颜色）
@@ -144,17 +201,31 @@ export const servers = sqliteTable("research_servers", {
 
 ### Step 4: 实验系统 (1周)
 
-- [ ] 创建实验（关联原子和代码）
-- [ ] 本地执行实验（使用 bash tool）
-- [ ] 捕获输出和指标
-- [ ] 结果归档
+**服务端**：
+
+- [ ] 创建 experiments 表
+- [ ] 实现实验 CRUD API
+- [ ] 本地执行实验（使用 OpenCode bash tool）
+
+**前端**：
+
+- [ ] 实验列表页面
+- [ ] 实验详情页面（输出日志）
+- [ ] 触发验证按钮
 
 ### Step 5: 远程服务器 - P1 (1周)
 
-- [ ] 服务器配置管理
+**服务端**：
+
+- [ ] 创建 servers 表
+- [ ] 实现服务器管理 API
 - [ ] SSH 连接池
 - [ ] 远程执行实验
-- [ ] 结果回传
+
+**前端**：
+
+- [ ] 服务器配置页面
+- [ ] 服务器选择 UI
 
 ### Step 6: 集成测试 (1周)
 

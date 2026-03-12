@@ -30,20 +30,67 @@
 
 ### 架构位置
 
+**服务端 (packages/opencode/src/research/)**：
+
 ```
 packages/opencode/src/
+├── research/                    # [NEW] 科研功能模块
+│   ├── index.ts                 # 模块入口
+│   ├── research.sql.ts          # Drizzle Schema
+│   ├── routes/                 # API 路由
+│   │   ├── project.ts          # 课题 API
+│   │   ├── atom.ts             # 原子 API
+│   │   ├── relation.ts         # 关系 API
+│   │   ├── experiment.ts        # 实验 API
+│   │   ├── paper.ts            # 文献 API
+│   │   ├── code.ts             # 代码项目 API
+│   │   └── server.ts           # 服务器 API
+│   └── services/                # 业务逻辑
+│       ├── experiment.ts        # 实验执行服务
+│       └── ssh.ts              # SSH 连接服务
+│
 ├── agent/           # Agent 定义
 ├── tool/            # Tool 定义
-├── research/        # [NEW] 科研功能模块
-│   ├── atom/        # 原子系统
-│   ├── paper/       # 文献管理
-│   ├── code/        # 代码项目管理
-│   ├── graph/       # 知识图谱
-│   ├── experiment/  # 实验执行
-│   ├── server/      # 远程服务器管理
-│   └── storage/     # 科研数据存储
 ├── session/        # 会话管理
 └── ...
+```
+
+**Web UI (packages/app/src/pages/research/)**：
+
+```
+packages/app/src/
+└── pages/
+    └── research/                # [NEW] 科研页面
+        ├── index.tsx            # 课题列表页
+        ├── project.tsx          # 课题总览（4栏布局）
+        ├── settings.tsx         # 课题设置
+        ├── chat.tsx             # AI 对话
+        ├── atom.tsx             # 原子编辑
+        ├── graph.tsx            # 知识图谱
+        ├── code/                # 代码项目管理
+        │   ├── index.tsx
+        │   └── [id].tsx
+        ├── paper/               # 文献管理
+        │   ├── index.tsx
+        │   └── [id].tsx
+        ├── experiment/          # 实验管理
+        │   ├── index.tsx
+        │   └── [id].tsx
+        ├── servers.tsx          # 服务器管理
+        └── validate.tsx         # 验证面板
+```
+
+**UI 组件 (packages/app/src/components/research/)**：
+
+```
+packages/app/src/
+└── components/
+    └── research/               # [NEW] 科研组件
+        ├── layout/              # 4栏布局组件
+        ├── atom/                # 原子相关组件
+        ├── graph/               # 图谱组件
+        ├── experiment/          # 实验组件
+        └── server/              # 服务器组件
 ```
 
 ---
