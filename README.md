@@ -1,322 +1,241 @@
-# [OpenResearch]
+# OpenResearch
 
+> **研究不是线性的流水线，而是一个不断扩展和演化的声明、证据与决策的动态图谱。**
 
-> **Research is not a single prompt. It is a growing graph of claims, evidence, and decisions.**
+OpenResearch 是一个开源的 **AI 辅助 AI/ML 研究系统**，核心理念非常简单：
 
-An open-source system for **AI-assisted AI/ML research**, built around a simple idea:
+**科学进展应被拆解为最小、可检验的原子——每个原子由 `声明 + 证据` 组成——整个研究被管理为一个不断扩张的原子网络。**
 
-**Scientific progress should be decomposed into minimal, inspectable atoms — each atom is one `claim + evidence` pair — and research should be managed as the continuous expansion of an atom network.**
-
-This project is not trying to make researchers disappear.
-
-It is trying to make **research legible, persistent, auditable, and collaborable** — so that humans and AI can work together at the level where real science actually happens: not only at the paper level, but at the level of **micro-claims, micro-failures, micro-insights, and micro-decisions**.
+本项目并非旨在取代研究者，而是让 **研究可读、持久、可交互** —— 让人类和 AI 在真正科学发生的核心层面协作：不仅是论文，而是每个 **声明、失败、洞察、决策**。
 
 ![research_loop.png](aset/research_loop.png)
 
 ---
 
-## Why this exists
+## 为什么需要 OpenResearch
 
-Most AI research tools treat research as a black-box pipeline:
+传统 AI 研究工具把研究看作黑箱流水线：
 
-**idea → code → experiments → paper**
+**想法 → 代码 → 实验 → 论文**
 
-That is useful, but it misses the thing that matters most in real research:
+这种方法固然有效，但忽略了研究中最关键的部分：
 
-**the state of reasoning between those steps.**
+**各步骤之间的推理状态。**
 
-A good research project is not just a sequence of outputs.
-It is a structured, evolving network of:
+一个优秀的研究项目并非单纯的输出序列，而是一个结构化、动态演化的网络，它记录了：
 
-* what we currently believe,
-* why we believe it,
-* what was tested,
-* what failed,
-* what remains uncertain,
-* and what should happen next.
+* 当前的科学信念
+* 信念背后的理由
+* 已验证的内容
+* 失败的尝试
+* 尚未解决的问题
+* 下一步可能的探索方向
 
-This project makes that hidden structure explicit.
+OpenResearch 将这些隐藏结构显式化，使研究透明、可追溯。
 
 ---
 
-## The core idea: atomize science
+## 核心理念：科学原子化
 
-We model research as a graph of minimal scientific atoms.
+研究被建模为最小科学原子的图谱，每个原子包含：
 
-Each atom contains:
+* **声明** —— 精确的科学陈述
+* **证据** —— 支撑声明的推导、实验、观察或结果
 
-* **Claim** — one precise scientific statement
-* **Evidence** — derivation, experiment, observation, or result supporting that statement
+原子通过类型化关系连接，例如：
 
-And atoms are connected by typed relations such as:
+* `motivates`（激励）
+* `formalizes`（形式化）
+* `derives`（推导）
+* `analyzes`（分析）
+* `validates`（验证）
+* `contradicts`（矛盾）
 
-* `motivates`
-* `formalizes`
-* `derives`
-* `analyzes`
-* `validates`
-* `contradicts`
-
-So instead of treating a paper as one giant blob, we treat it as a **living reasoning graph**.
-
-That graph becomes the real state of the project.
+因此，我们不把论文当作一个整体，而是将其视为 **活的推理图**。这张图实时反映研究的状态。
 
 ![atom.png](aset/atom.png)
----
-
-## What this unlocks
-
-### 1. Lower hallucination risk
-
-AI is much more reliable when it is forced to operate on explicit, local objects instead of hand-waving over an entire research agenda.
-
-By grounding every step in a concrete `claim + evidence` unit, the system is pushed toward:
-
-* local reasoning,
-* explicit justification,
-* and inspectable failure.
-
-Not perfect truth — but much better scientific discipline.
-
-### 2. Persistent memory for long-horizon research
-
-Real AI/ML research is messy and long-running.
-Small insights are easy to lose. Dead ends repeat. Important partial progress disappears into notebooks, chats, and intuition.
-
-This project turns those fragments into persistent structure:
-
-* every micro-result can be stored,
-* every claim can be revised,
-* every validation can be traced,
-* every new idea can attach to prior work.
-
-The result is a research memory that compounds over time.
-
-### 3. Fine-grained human–AI collaboration
-
-The most valuable part of senior researchers is usually not raw execution.
-It is taste, intuition, skepticism, and the ability to notice what matters.
-
-Most “auto-research” systems only let humans intervene at coarse checkpoints.
-
-This project instead lets humans collaborate with AI at the granularity of:
-
-* one claim,
-* one theorem,
-* one design decision,
-* one failed experiment,
-* one suspicious result.
-
-That is where expert intuition is strongest.
 
 ---
 
-## The research loop
+## OpenResearch 的价值
 
-This project is designed around an iterative loop:
+### 1. 减少幻觉
 
-1. **Human or AI proposes a new claim**
-2. **AI expands the local atom context**
-3. **AI generates a validation plan**
-4. **AI writes code and runs experiments**
-5. **Evidence, metrics, and conclusions are attached back to the atom graph**
-6. **Human accepts, rejects, refines, or splits the claim**
-7. **The graph grows**
-8. **The next claim emerges from the updated graph**
+AI 在明确、局部对象上操作，比笼统处理整个议题更可靠。每个步骤依托 `声明 + 证据` 单元，使系统专注于：
 
-In other words:
+* 局部推理
+* 明确论证
+* 可检验失败
 
-> **Research is modeled as continuous graph expansion, not one-shot paper generation.**
+提升科学纪律性，虽不保证绝对真理，但显著降低错误推断。
 
----
+### 2. 持久的长期研究记忆
 
-## What makes this different
+AI/ML 研究复杂且周期长，洞察容易丢失，死胡同重复出现，部分进展淹没在笔记、讨论中。OpenResearch 将碎片信息转化为持久结构：
 
-There are already systems aiming to automate research end-to-end.
-FARS is one of the clearest examples.
+* 每个微结果可存储
+* 每个声明可修正
+* 每个验证可追踪
+* 新想法可链接至已有工作
 
-Public material describes **FARS** as a **Fully Automated Research System**: an end-to-end AI research system operating at scale, intended to autonomously perform the research workflow, and recent automated-research reports describe it as a commercial platform targeting general scientific domains. ([Analemma][1])
+从而形成随时间积累的研究记忆。
 
-That is an impressive direction.
+### 3. 精细的人机协作
 
-But this project is optimizing for a different center of gravity.
+专家最有价值的能力并非执行，而是品味、直觉与发现关键问题的能力。OpenResearch 允许人类在微粒度上与 AI 协作：
 
-### FARS optimizes for:
+* 单个声明
+* 单个定理
+* 单个设计决策
+* 单个失败实验
+* 单个可疑结果
 
-* end-to-end autonomy
-* throughput
-* broad automated execution
-* idea-to-paper completion
-
-### This project optimizes for:
-
-* atomic provenance
-* inspectable reasoning state
-* persistent scientific memory
-* human-in-the-loop control
-* fine-grained steering of research
-
-So the difference is not merely “more autonomous” vs “less autonomous”.
-
-The deeper difference is:
-
-> **FARS treats research as a pipeline to complete.**
-> **This project treats research as a knowledge graph to build.**
-
-That design choice matters.
-
-Because for serious AI/ML research, the bottleneck is often not just execution.
-It is maintaining a faithful representation of what has actually been learned.
+充分发挥专家直觉。
 
 ---
 
-## Why a graph instead of a paper-first workflow?
+## 研究循环
 
-Because papers are the compression artifact.
-Research is the underlying structure.
+OpenResearch 设计为迭代循环：
 
-A paper hides:
+1. **人类或 AI 提出新声明**
+2. **AI 扩展局部原子上下文**
+3. **AI 生成验证计划**
+4. **AI 编写代码并运行实验**
+5. **将证据和结果附加回原子图**
+6. **人类接受、拒绝、修改或拆分声明**
+7. **图谱扩展**
+8. **下一个声明从更新图中产生**
 
-* abandoned branches
-* intermediate claims
-* failed validations
-* fragile assumptions
-* alternative interpretations
-* unresolved contradictions
-
-But those are exactly the objects that matter when humans and AI are doing iterative discovery together.
-
-The atom graph keeps them alive.
+> **研究被建模为持续的图谱扩展，而非一次性生成论文。**
 
 ---
 
-## Built for AI/ML research
+## OpenResearch 与现有系统的区别
 
-This project is especially suited for AI/ML because the field naturally mixes:
+已有系统如 **FARS** 尝试全自动化研究：端到端执行流程，实现从想法到论文的闭环。虽然高效，但关注点不同。
 
-* empirical claims
-* algorithmic constructions
-* theoretical guarantees
-* implementation details
-* benchmark-driven validation
+### FARS 关注：
+* 端到端自主执行
+* 高吞吐量
+* 广泛自动化
+* 快速完成论文
 
-We therefore model different logical layers explicitly, such as:
+### OpenResearch 关注：
+* 原子级溯源
+* 可检查的推理状态
+* 持久科学记忆
+* 人类参与控制
+* 精细化研究引导
 
-* **Fact claims**
-* **Method claims**
-* **Theorem claims**
-* **Verification claims**
+> **FARS 将研究视为完成论文的流水线**  
+> **OpenResearch 将研究视为知识图谱构建**
 
-That means a theorem is not confused with a method.
-A benchmark result is not confused with a background fact.
-A design choice is not confused with its empirical validation.
-
-This separation is what makes the graph actually useful.
-
----
-
-## What the system should eventually become
-
-Not just an “AI scientist”.
-
-A **research operating system**.
-
-A place where:
-
-* ideas become claims,
-* claims become executable validations,
-* results become structured evidence,
-* contradictions become visible,
-* and the entire project stays navigable over months or years.
-
-The long-term goal is not to replace researchers.
-
-It is to build the infrastructure that lets human researchers and AI systems **co-discover** more effectively than either could alone.
-
+在严肃 AI/ML 研究中，核心不是执行，而是维护逻辑路径、探索方向及推理透明度。
 
 ---
 
-## Current Vision
+## 为什么选择图而非论文优先
 
-We envision a **research operating system** where humans and AI collaborate seamlessly, turning scientific ideas into structured knowledge and actionable insights. In this system, you can:
+论文是压缩产物，隐藏了：
 
-* **Ingest papers** and decompose them into minimal claim–evidence atoms
-* **Build and maintain a persistent graph** of claims, evidence, methods, theorems, and validations
-* **Propose new claims** from local graph context, guided by AI suggestions and human intuition
-* **Automatically generate validation plans** and synthesize executable code from method atoms
-* **Run experiments and simulations**, collecting structured evidence
-* **Attach results back to the network**, preserving full provenance
-* **Accept, reject, refine, or split claims**, supporting iterative discovery
-* **Collaborate across teams**, allowing multiple researchers to interact with the graph in real time
-* **Automatically generate drafts** for papers, reports, or presentations from the graph
-* **Continuously grow a project-level research memory**, capturing all micro-progress and insights
+* 被放弃的分支
+* 中间声明
+* 失败验证
+* 脆弱假设
+* 替代解释
+* 未解决的矛盾
 
-> The goal is a **full-stack research ecosystem**: one that transforms ideas into structured knowledge, experimental evidence, and polished outputs, all while maintaining transparency, traceability, and human oversight.
-
-
-
-## Why open source
-
-Because research infrastructure should be inspectable too.
-
-If the goal is trustworthy AI-assisted science, then the system itself should be:
-
-* transparent,
-* hackable,
-* extensible,
-* and owned by the community that uses it.
-
-Open source is not just a distribution model here.
-It is part of the epistemology.
+这些正是迭代发现时最关键的元素。原子图确保它们可见、可用于下一轮决策。
 
 ---
 
-## Who this is for
+## 为 AI/ML 研究而建
 
-This project is for people who believe that the future of scientific AI is not just:
+AI/ML 研究涵盖：
+* 实证声明
+* 算法构造
+* 理论保证
+* 实现细节
+* 基准验证
 
-* “ask for a paper”
-* “ask for an experiment”
-* “ask for a result”
+因此，OpenResearch 明确区分逻辑层：
+* **事实声明**
+* **方法声明**
+* **定理声明**
+* **验证声明**
 
-but:
-
-* **build a persistent scientific state**
-* **reason locally**
-* **preserve uncertainty**
-* **make progress inspectable**
-* **let humans and AI collaborate at claim resolution**
-
----
-
-## Status
-
-Early, ambitious, and very much under construction.
-
-But the thesis is simple:
-
-> **The missing abstraction for AI-assisted research is not another writing agent.**
-> **It is a durable graph of claims, evidence, and decisions.**
-
-If that thesis is right, this project points toward a very different future for AI research tooling.
+确保图谱清晰、可用。
 
 ---
 
-## Join us
+## 系统的最终愿景
 
-If you care about:
+OpenResearch 不只是“AI 科学家”，而是 **研究操作系统**：
 
-* AI for science
-* AI for AI research
-* human–AI co-discovery
-* structured scientific memory
-* interpretable research agents
-* long-horizon research workflows
+* 想法变声明
+* 声明生成可执行验证
+* 结果转结构化证据
+* 矛盾可见
+* 项目长期可导航
 
-then this project is for you.
-
-Let’s stop treating research as a monolithic prompt.
-
-Let’s build the graph.
+目标不是取代研究者，而是让人类与 AI 协同发现，比单独任何一方更高效。
 
 ---
+
+## 当前愿景
+
+人类与 AI 无缝协作，将科学想法转化为结构化知识和实验结果：
+
+* **分析文献**，分解为声明–证据原子
+* **构建持久图谱**，记录声明与证据
+* **提出新声明**，AI 建议 + 人类直觉
+* **生成验证计划**，从原子生成可执行代码
+* **运行实验和仿真**，收集结构化证据
+* **附加结果回网络**，保持溯源
+* **接受/拒绝/修改/拆分声明**，支持迭代发现
+* **跨团队协作**，实时互动图谱
+* **自动生成论文、报告或演示稿草稿**
+* **持续增长研究记忆**，记录所有微进展与洞察
+
+> 全栈研究生态：自动将想法转化为知识、证据和成果，同时保持透明与可追溯。
+
+---
+
+## 为什么开源
+
+研究基础设施应当可检查、可扩展、社区共有。
+
+---
+
+## 适用对象
+
+OpenResearch 适合关注：
+* 构建持久科学状态
+* 局部推理
+* 保持不确定性
+* 可检查进展
+* 人机协作解决声明
+
+而非单纯追求论文、实验或结果。
+
+---
+
+## 项目状态
+
+早期阶段，仍在建设中。
+
+核心理念：
+
+> **AI 辅助研究缺失的不是写作代理，而是可自动维护和演化的逻辑图谱**
+
+---
+
+## 加入我们
+
+适合关心以下几项的人群：
+* AI 辅助科学研究（尤其是 AI/ML）
+* 人机协作发现
+* 结构化科学记忆
+* 可解释研究代理
+* 长期研究工作流
