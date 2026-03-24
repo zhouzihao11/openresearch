@@ -215,7 +215,7 @@ export function DialogNewResearchProject(props: DialogNewResearchProjectProps) {
   const [paperPaths, setPaperPaths] = createSignal<string[]>([])
   const [backgroundPath, setBackgroundPath] = createSignal<string>()
   const [goalPath, setGoalPath] = createSignal<string>()
-  const [picker, setPicker] = createSignal<null | "papers" | "background" | "goal">(null)
+  const [picker, setPicker] = createSignal<null | "target" | "papers" | "background" | "goal">(null)
   const [submitting, setSubmitting] = createSignal(false)
   const [error, setError] = createSignal<string>()
 
@@ -287,7 +287,21 @@ export function DialogNewResearchProject(props: DialogNewResearchProjectProps) {
 
           <div class="flex flex-col gap-2">
             <label class="text-12-medium text-text-strong">创建位置</label>
-            <TextField value={targetDir()} placeholder="请输入项目创建的目标路径" onChange={setTargetDir} />
+            <div class="flex items-center gap-2">
+              <TextField
+                value={targetDir()}
+                placeholder="请输入或选择项目创建位置"
+                onChange={setTargetDir}
+                class="flex-1"
+              />
+              <Button variant="ghost" onClick={() => setTargetDir("")}>
+                清除
+              </Button>
+              <Button variant="secondary" onClick={() => setPicker("target")}>
+                选择文件夹
+              </Button>
+            </div>
+            <div class="text-12-regular text-text-weak">支持手动输入，也支持搜索文件夹后选择创建位置</div>
           </div>
 
           <div class="flex flex-col gap-2">
@@ -346,6 +360,16 @@ export function DialogNewResearchProject(props: DialogNewResearchProjectProps) {
           </div>
         </div>
       </Dialog>
+
+      <Show when={picker() === "target"}>
+        <DialogPathPicker
+          title="选择创建位置"
+          mode="directories"
+          startDir={() => targetDir() || undefined}
+          onSelect={(v) => setTargetDir(Array.isArray(v) ? v[0] : v)}
+          onClose={() => setPicker(null)}
+        />
+      </Show>
 
       <Show when={picker() === "papers"}>
         <DialogPathPicker

@@ -335,8 +335,33 @@ export namespace File {
     type Entry = { files: string[]; dirs: string[] }
     let cache: Entry = { files: [], dirs: [] }
     let fetching = false
+    let scanned: string[] | undefined
+    let scanning: Promise<string[]> | undefined
 
     const isGlobalHome = Instance.directory === Global.Path.home && Instance.project.id === "global"
+
+    const homefiles = async () => {
+      if (!isGlobalHome) return cache.files
+      if (scanned) return scanned
+      if (scanning) return scanning
+
+      scanning = Array.fromAsync(
+        Ripgrep.files({
+          cwd: Instance.directory,
+          hidden: false,
+          glob: ["!**/node_modules/**", "!**/dist/**", "!**/build/**", "!**/target/**", "!**/vendor/**"],
+        }),
+      )
+        .then((files) => {
+          scanned = files
+          return files
+        })
+        .finally(() => {
+          scanning = undefined
+        })
+
+      return scanning
+    }
 
     const fn = async (result: Entry) => {
       // Disable scanning if in root of file system
@@ -406,6 +431,9 @@ export namespace File {
           })
         }
         return cache
+      },
+      async homefiles() {
+        return homefiles()
       },
     }
   })
@@ -628,7 +656,9 @@ export namespace File {
     const kind = input.type ?? (input.dirs === false ? "file" : "all")
     log.info("search", { query, kind })
 
-    const result = await state().then((x) => x.files())
+    const store = await state()
+    const result = await store.files()
+    const isGlobalHome = Instance.directory === Global.Path.home && Instance.project.id === "global"
 
     const hidden = (item: string) => {
       const normalized = item.replaceAll("\\", "/").replace(/\/+$/, "")
@@ -652,7 +682,16 @@ export namespace File {
     }
 
     const items =
-      kind === "file" ? result.files : kind === "directory" ? result.dirs : [...result.files, ...result.dirs]
+      kind === "file"
+        ? isGlobalHome && query
+          ? await store.homefiles()
+          : result.files
+        : kind === "directory"
+          ? result.dirs
+          : [
+              ...(isGlobalHome && query ? await store.homefiles() : result.files),
+              ...result.dirs,
+            ]
 
     const searchLimit = kind === "directory" && !preferHidden ? limit * 20 : limit
     const sorted = fuzzysort.go(query, items, { limit: searchLimit }).map((r) => r.target)

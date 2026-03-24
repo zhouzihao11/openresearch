@@ -10,6 +10,7 @@ import { eq } from "drizzle-orm"
 import { Session } from "@/session"
 import { errors } from "../error"
 import fs from "fs"
+import { git } from "@/util/git"
 
 const createSchema = z.object({
   name: z.string().min(1, "name required"),
@@ -26,6 +27,11 @@ async function copyFile(src: string, dest: string) {
 }
 
 const uniqueID = () => crypto.randomUUID()
+
+function gitError(result: { stderr?: Buffer; text?: () => string }, fallback: string) {
+  const text = result.stderr?.toString().trim() || result.text?.().trim() || fallback
+  return text
+}
 
 const atomSchema = z.object({
   atom_id: z.string(),
@@ -209,26 +215,53 @@ export const ResearchRoutes = new Hono()
       if (backgroundDest && body.backgroundPath) await copyFile(body.backgroundPath, backgroundDest)
       if (goalDest && body.goalPath) await copyFile(body.goalPath, goalDest)
 
-      let project
+      let project: Awaited<ReturnType<typeof Project.fromDirectory>>
       try {
-        const initial = await Project.fromDirectory(target)
-        const withGit = await Project.initGit({ directory: target, project: initial.project })
-        // initGit only does git init, need an initial commit for a unique project ID
-        if (withGit.id === "global") {
-          const { exited: addExited } = Bun.spawn(["git", "add", "."], {
+        const hasGit = await Filesystem.exists(path.join(target, ".git"))
+        if (!hasGit) {
+          const init = await git(["init", "--quiet"], {
             cwd: target,
-            stdout: "ignore",
-            stderr: "ignore",
           })
-          await addExited
-          const { exited: commitExited } = Bun.spawn(["git", "commit", "-m", "init", "--allow-empty"], {
+          if (init.exitCode !== 0) throw new Error(gitError(init, "failed to initialize git repository"))
+
+          const add = await git(["add", "."], {
             cwd: target,
-            stdout: "ignore",
-            stderr: "ignore",
           })
-          await commitExited
+          if (add.exitCode !== 0) throw new Error(gitError(add, "failed to stage initial research project files"))
+
+          const commit = await git(["commit", "-m", "init", "--allow-empty"], {
+            cwd: target,
+            env: {
+              ...process.env,
+              GIT_AUTHOR_NAME: process.env.GIT_AUTHOR_NAME || "OpenCode",
+              GIT_AUTHOR_EMAIL: process.env.GIT_AUTHOR_EMAIL || "opencode@local",
+              GIT_COMMITTER_NAME: process.env.GIT_COMMITTER_NAME || "OpenCode",
+              GIT_COMMITTER_EMAIL: process.env.GIT_COMMITTER_EMAIL || "opencode@local",
+            },
+          })
+          if (commit.exitCode !== 0) throw new Error(gitError(commit, "failed to create initial git commit"))
         }
         project = await Project.fromDirectory(target)
+        if (project.project.id === "global") throw new Error("failed to resolve initialized project id")
+
+        const existing = Database.use((db) =>
+          db
+            .select({ research_project_id: ResearchProjectTable.research_project_id })
+            .from(ResearchProjectTable)
+            .where(eq(ResearchProjectTable.project_id, project.project.id))
+            .get(),
+        )
+        if (existing) {
+          return c.json(
+            {
+              success: false,
+              message: "research project already exists for this git repository",
+              research_project_id: existing.research_project_id,
+              project_id: project.project.id,
+            },
+            400,
+          )
+        }
       } catch (err) {
         return c.json({ success: false, message: "failed to create project", error: `${err}` }, 400)
       }
