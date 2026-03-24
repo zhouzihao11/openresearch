@@ -47,7 +47,9 @@ export const ResearchInfoTool = Tool.define("research_info", {
       ...articles.map((a) => `  [${a.article_id}] ${a.title ?? "(untitled)"} | status: ${a.status} | path: ${a.path}`),
       "",
       `--- Atoms (${atoms.length}) ---`,
-      ...atoms.map((a) => `  [${a.atom_id}] ${a.atom_name} | type: ${a.atom_type} | proof: ${a.atom_proof_status}`),
+      ...atoms.map(
+        (a) => `  [${a.atom_id}] ${a.atom_name} | type: ${a.atom_type} | evidence: ${a.atom_evidence_status}`,
+      ),
     ]
 
     return {

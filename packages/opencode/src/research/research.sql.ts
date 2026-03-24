@@ -3,9 +3,9 @@ import { ProjectTable } from "../project/project.sql"
 import { SessionTable } from "../session/session.sql"
 import { Timestamps } from "@/storage/schema.sql"
 
-const atomKinds = (["fact", "method", "theorem", "verification"] as const)
-const proofKinds = ["math", "experiment"] as const
-const proofSteps = ["pending", "in_progress", "done"] as const
+const atomKinds = ["fact", "method", "theorem", "verification"] as const
+const evidenceKinds = ["math", "experiment"] as const
+const evidenceSteps = ["pending", "in_progress", "done"] as const
 const linkKinds = ["motivates", "formalizes", "derives", "analyzes", "validates", "contradicts", "other"] as const
 
 export const ResearchProjectTable = sqliteTable(
@@ -53,10 +53,10 @@ export const AtomTable = sqliteTable(
     atom_name: text().notNull(),
     atom_type: text().$type<(typeof atomKinds)[number]>().notNull(),
     atom_content_path: text(),
-    atom_proof_type: text().$type<(typeof proofKinds)[number]>().notNull(),
-    atom_proof_plan_path: text(),
-    atom_proof_status: text().$type<(typeof proofSteps)[number]>().notNull().default("pending"),
-    atom_proof_result_path: text(),
+    atom_evidence_type: text().$type<(typeof evidenceKinds)[number]>().notNull(),
+    atom_evidence_plan_path: text(),
+    atom_evidence_status: text().$type<(typeof evidenceSteps)[number]>().notNull().default("pending"),
+    atom_evidence_result_path: text(),
     article_id: text().references(() => ArticleTable.article_id, { onDelete: "set null" }),
     exp_id: text().references(() => ExperimentTable.exp_id, { onDelete: "set null" }),
     session_id: text().references(() => SessionTable.id, { onDelete: "set null" }),

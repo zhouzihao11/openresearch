@@ -15,7 +15,7 @@ const TYPE_LABELS: Record<string, string> = {
   verification: "Verification",
 }
 
-const PROOF_STATUS_LABELS: Record<string, string> = {
+const EVIDENCE_STATUS_LABELS: Record<string, string> = {
   pending: "Pending",
   in_progress: "In Progress",
   done: "Done",
@@ -65,7 +65,7 @@ function AtomCard(props: { atom: Atom; relations: Relation[]; atomMap: Map<strin
         </div>
       </div>
       <div class="flex items-center gap-2 text-11-regular text-text-weak">
-        <span>{PROOF_STATUS_LABELS[props.atom.atom_proof_status] ?? props.atom.atom_proof_status}</span>
+        <span>{EVIDENCE_STATUS_LABELS[props.atom.atom_evidence_status] ?? props.atom.atom_evidence_status}</span>
         <Show when={relCount() > 0 ? relCount() : null} keyed>
           {(count) => (
             <>

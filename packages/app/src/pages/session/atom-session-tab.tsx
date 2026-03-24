@@ -30,9 +30,9 @@ export function AtomSessionTab(props: { atom: Atom; activeTab: "content" | "proo
       case "content":
         return props.atom.atom_content_path
       case "proof":
-        return props.atom.atom_proof_result_path
+        return props.atom.atom_evidence_result_path
       case "plan":
-        return props.atom.atom_proof_plan_path
+        return props.atom.atom_evidence_plan_path
       default:
         return null
     }
@@ -71,8 +71,8 @@ export function AtomSessionTab(props: { atom: Atom; activeTab: "content" | "proo
       // So we check if one ends with the other
       if (
         (event.file === currentFilePath ||
-         event.file.endsWith(currentFilePath) ||
-         currentFilePath.endsWith(event.file)) &&
+          event.file.endsWith(currentFilePath) ||
+          currentFilePath.endsWith(event.file)) &&
         (event.event === "change" || event.event === "add")
       ) {
         console.log("[atom-session-tab] File changed, reloading:", currentFilePath)
@@ -150,9 +150,7 @@ export function AtomSessionTab(props: { atom: Atom; activeTab: "content" | "proo
         <Show when={hasError()}>
           <div class="rounded-md border border-border-weak-base bg-background-base p-3">
             <div class="text-12-semibold text-text-strong mb-2">{tabTitle()}</div>
-            <div class="text-12-regular text-text-weak">
-              Failed to load file content.
-            </div>
+            <div class="text-12-regular text-text-weak">Failed to load file content.</div>
           </div>
         </Show>
 

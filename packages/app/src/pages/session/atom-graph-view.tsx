@@ -31,7 +31,7 @@ const TYPE_LABELS: Record<string, string> = {
   verification: "Verification",
 }
 
-const PROOF_STATUS_LABELS: Record<string, string> = {
+const EVIDENCE_STATUS_LABELS: Record<string, string> = {
   pending: "Pending",
   in_progress: "In Progress",
   done: "Done",
@@ -122,7 +122,7 @@ export function AtomGraphView(props: {
       data: {
         name: atom.atom_name,
         type: atom.atom_type,
-        status: atom.atom_proof_status,
+        status: atom.atom_evidence_status,
       },
     }))
 
@@ -331,7 +331,7 @@ export function AtomGraphView(props: {
         const atom = props.atoms.find((a) => a.atom_id === nodeId)
         if (atom) {
           const typeLabel = TYPE_LABELS[atom.atom_type] ?? atom.atom_type
-          const statusLabel = PROOF_STATUS_LABELS[atom.atom_proof_status] ?? atom.atom_proof_status
+          const statusLabel = EVIDENCE_STATUS_LABELS[atom.atom_evidence_status] ?? atom.atom_evidence_status
 
           const tooltip = createTooltip()
 
