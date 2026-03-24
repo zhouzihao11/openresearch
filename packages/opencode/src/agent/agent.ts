@@ -11,6 +11,7 @@ import { ProviderTransform } from "../provider/transform"
 import PROMPT_GENERATE from "./generate.txt"
 import PROMPT_COMPACTION from "./prompt/compaction.txt"
 import PROMPT_EXPLORE from "./prompt/explore.txt"
+import PROMPT_RESEARCH from "./prompt/research.txt"
 import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
 import PROMPT_RESEARCH_PROJECT_INIT from "./prompt/research_project_init.txt"
@@ -78,7 +79,7 @@ export namespace Agent {
     const result: Record<string, Info> = {
       build: {
         name: "build",
-        description: "The default agent. Executes tools based on configured permissions.",
+        description: "General-purpose coding agent. Executes tools based on configured permissions.",
         options: {},
         permission: PermissionNext.merge(
           defaults,
@@ -88,6 +89,29 @@ export namespace Agent {
           }),
           user,
         ),
+        mode: "primary",
+        native: true,
+      },
+      research: {
+        name: "research",
+        description:
+          "The primary OpenResearch agent. Maintains research state as an evolving graph of claim-evidence atoms, relations, plans, and research documents.",
+        options: {},
+        permission: PermissionNext.merge(
+          defaults,
+          PermissionNext.fromConfig({
+            question: "allow",
+            plan_enter: "allow",
+            bash: "ask",
+            edit: {
+              "*": "deny",
+              "*.md": "allow",
+              "**/*.md": "allow",
+            },
+          }),
+          user,
+        ),
+        prompt: PROMPT_RESEARCH,
         mode: "primary",
         native: true,
       },
@@ -285,7 +309,7 @@ export namespace Agent {
     return pipe(
       await state(),
       values(),
-      sortBy([(x) => (cfg.default_agent ? x.name === cfg.default_agent : x.name === "build"), "desc"]),
+      sortBy([(x) => (cfg.default_agent ? x.name === cfg.default_agent : x.name === "research"), "desc"]),
     )
   }
 

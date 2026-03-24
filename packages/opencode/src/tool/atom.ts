@@ -18,11 +18,11 @@ export const AtomCreateTool = Tool.define("atom_create", {
     "Create a new atom (the smallest verifiable unit of knowledge). " +
     "An atom consists of a claim and its evidence. " +
     "Use this tool when you need to add a new claim of fact, method, theorem, or verification to the research project. " +
-    "IMPORTANT: All content and evidence MUST use markdown syntax with proper LaTeX math formulas ($...$ for inline, $$...$$ for block) and code blocks (```language).",
+    "IMPORTANT: All claim and evidence MUST use markdown syntax with proper LaTeX math formulas ($...$ for inline, $$...$$ for block) and code blocks (```language).",
   parameters: z.object({
     name: z.string().describe("A short descriptive name for the atom"),
     type: z.enum(atomKinds).describe("The kind of atom: fact, method, theorem, or verification"),
-    content: z
+    claim: z
       .string()
       .describe(
         "The detailed description of the atom's claim. " +
@@ -57,14 +57,14 @@ export const AtomCreateTool = Tool.define("atom_create", {
 
     const atomId = crypto.randomUUID()
     const atomDir = path.join(Instance.directory, "atom_list", atomId)
-    const contentPath = path.join(atomDir, "content.md")
+    const claimPath = path.join(atomDir, "claim.md")
 
-    await Filesystem.write(contentPath, params.content)
+    await Filesystem.write(claimPath, params.claim)
 
-    let proofPath: string | null = null
+    let evidencePath: string | null = null
     if (params.evidence) {
-      proofPath = path.join(atomDir, "proof.md")
-      await Filesystem.write(proofPath, params.evidence)
+      evidencePath = path.join(atomDir, "evidence.md")
+      await Filesystem.write(evidencePath, params.evidence)
     }
 
     const now = Date.now()
@@ -76,10 +76,10 @@ export const AtomCreateTool = Tool.define("atom_create", {
           research_project_id: researchProjectId,
           atom_name: params.name,
           atom_type: params.type,
-          atom_content_path: contentPath,
+          atom_claim_path: claimPath,
           atom_evidence_type: "math",
           atom_evidence_status: "pending",
-          atom_evidence_result_path: proofPath,
+          atom_evidence_path: evidencePath,
           article_id: params.articleId ?? null,
           time_created: now,
           time_updated: now,
@@ -96,7 +96,7 @@ export const AtomCreateTool = Tool.define("atom_create", {
         `- ID: ${atomId}`,
         `- Name: ${params.name}`,
         `- Type: ${params.type}`,
-        `- Content path: ${contentPath}`,
+        `- Claim path: ${claimPath}`,
         params.articleId ? `- Source article: ${params.articleId}` : `- Source: user created`,
       ].join("\n"),
       metadata: {
@@ -114,9 +114,10 @@ function formatAtom(row: AtomRow): string {
     `evidence_type: ${row.atom_evidence_type}`,
     `evidence_status: ${row.atom_evidence_status}`,
     `research_project_id: ${row.research_project_id}`,
-    row.atom_content_path ? `content_path: ${row.atom_content_path}` : null,
-    row.atom_evidence_plan_path ? `evidence_plan_path: ${row.atom_evidence_plan_path}` : null,
-    row.atom_evidence_result_path ? `evidence_result_path: ${row.atom_evidence_result_path}` : null,
+    row.atom_claim_path ? `claim_path: ${row.atom_claim_path}` : null,
+    row.atom_experiments_plan_path ? `experiments_plan_path: ${row.atom_experiments_plan_path}` : null,
+    row.atom_evidence_path ? `evidence_path: ${row.atom_evidence_path}` : null,
+    row.atom_evidence_assessment_path? `evidence_assessment_path: ${row.atom_evidence_assessment_path}` : null,
     row.article_id ? `article_id: ${row.article_id}` : null,
     row.exp_id ? `exp_id: ${row.exp_id}` : null,
     row.session_id ? `session_id: ${row.session_id}` : null,
@@ -189,14 +190,14 @@ export const AtomBatchCreateTool = Tool.define("atom_batch_create", {
     "Batch create atoms and their relations in one call. " +
     "The atoms list defines each atom. The relations list defines edges between atoms, " +
     "where source and target are zero-based indexes into the atoms list. " +
-    "IMPORTANT: All content and evidence MUST use markdown syntax with proper LaTeX math formulas ($...$ for inline, $$...$$ for block) and code blocks (```language).",
+    "IMPORTANT: All claim and evidence MUST use markdown syntax with proper LaTeX math formulas ($...$ for inline, $$...$$ for block) and code blocks (```language).",
   parameters: z.object({
     atoms: z
       .array(
         z.object({
           name: z.string().describe("A short descriptive name for the atom"),
           type: z.enum(atomKinds).describe("The kind of atom: fact, method, theorem, or verification"),
-          content: z
+          claim: z
             .string()
             .describe(
               "The detailed description of the atom's claim. " +
@@ -271,11 +272,11 @@ export const AtomBatchCreateTool = Tool.define("atom_batch_create", {
     for (const atom of params.atoms) {
       const atomId = crypto.randomUUID()
       atomIds.push(atomId)
-      const contentPath = path.join(Instance.directory, "atom_list", atomId, "content.md")
-      await Filesystem.write(contentPath, atom.content)
+      const claimPath = path.join(Instance.directory, "atom_list", atomId, "claim.md")
+      await Filesystem.write(claimPath, atom.claim)
       if (atom.evidence) {
-        const proofPath = path.join(Instance.directory, "atom_list", atomId, "proof.md")
-        await Filesystem.write(proofPath, atom.evidence)
+        const evidencePath = path.join(Instance.directory, "atom_list", atomId, "evidence.md")
+        await Filesystem.write(evidencePath, atom.evidence)
         hasProof.push(true)
       } else {
         hasProof.push(false)
@@ -290,12 +291,10 @@ export const AtomBatchCreateTool = Tool.define("atom_batch_create", {
         research_project_id: researchProjectId,
         atom_name: atom.name,
         atom_type: atom.type,
-        atom_content_path: path.join(Instance.directory, "atom_list", atomIds[i], "content.md"),
+        atom_claim_path: path.join(Instance.directory, "atom_list", atomIds[i], "claim.md"),
         atom_evidence_type: "math" as const,
         atom_evidence_status: "pending" as const,
-        atom_evidence_result_path: hasProof[i]
-          ? path.join(Instance.directory, "atom_list", atomIds[i], "proof.md")
-          : null,
+        atom_evidence_path: hasProof[i] ? path.join(Instance.directory, "atom_list", atomIds[i], "evidence.md") : null,
         article_id: atom.articleId ?? null,
         time_created: now,
         time_updated: now,
@@ -341,7 +340,7 @@ export const AtomBatchCreateTool = Tool.define("atom_batch_create", {
 export const AtomDeleteTool = Tool.define("atom_delete", {
   description:
     "Delete one or more atoms and all their related relations. " +
-    "This will permanently remove the atoms, their content files, proof files, and all relations pointing to or from these atoms.",
+    "This will permanently remove the atoms, their claim files, evidence files, and all relations pointing to or from these atoms.",
   parameters: z.object({
     atomIds: z.array(z.string()).describe("Array of atom IDs to delete"),
   }),

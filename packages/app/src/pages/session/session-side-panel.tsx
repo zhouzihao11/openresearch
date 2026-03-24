@@ -174,7 +174,7 @@ export function SessionSidePanel(props: {
           tab !== "review" &&
           tab !== "atoms" &&
           tab !== "atom-content" &&
-          tab !== "atom-proof" &&
+          tab !== "atom-evidence" &&
           tab !== "atom-plan"
         )
       }),
@@ -186,7 +186,7 @@ export function SessionSidePanel(props: {
     if (active === "review" && reviewTab()) return "review"
     if (active === "atoms" && isResearchProject() && !isAtomSession()) return "atoms"
     if (active === "atom-content" && isAtomSession()) return "atom-content"
-    if (active === "atom-proof" && isAtomSession()) return "atom-proof"
+    if (active === "atom-evidence" && isAtomSession()) return "atom-evidence"
     if (active === "atom-plan" && isAtomSession()) return "atom-plan"
     if (active && file.pathFromTab(active)) return normalizeTab(active)
 
@@ -325,7 +325,7 @@ export function SessionSidePanel(props: {
                             <div>Claim</div>
                           </div>
                         </Tabs.Trigger>
-                        <Tabs.Trigger value="atom-proof">
+                        <Tabs.Trigger value="atom-evidence">
                           <div class="flex items-center gap-1.5">
                             <div>Evidence</div>
                           </div>
@@ -412,9 +412,9 @@ export function SessionSidePanel(props: {
                             <AtomSessionTab atom={atom} activeTab="content" />
                           </Show>
                         </Tabs.Content>
-                        <Tabs.Content value="atom-proof" class="flex flex-col h-full overflow-hidden contain-strict">
-                          <Show when={activeTab() === "atom-proof"}>
-                            <AtomSessionTab atom={atom} activeTab="proof" />
+                        <Tabs.Content value="atom-evidence" class="flex flex-col h-full overflow-hidden contain-strict">
+                          <Show when={activeTab() === "atom-evidence"}>
+                            <AtomSessionTab atom={atom} activeTab="evidence" />
                           </Show>
                         </Tabs.Content>
                         <Tabs.Content value="atom-plan" class="flex flex-col h-full overflow-hidden contain-strict">
