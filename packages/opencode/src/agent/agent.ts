@@ -263,6 +263,8 @@ export namespace Agent {
             atom_query: "allow",
             read: "allow",
             write: "allow",
+            edit: "allow",
+            apply_patch: "allow",
             question: "allow",
           }),
           user,
