@@ -3239,6 +3239,7 @@ export class Server extends HeyApiClient {
         port: number
         user: string
         password: string
+        resource_root?: string
         wandb_api_key?: string
         wandb_project_name?: string
       }
@@ -3306,7 +3307,7 @@ export class Server extends HeyApiClient {
 
 export class ExperimentWatch extends HeyApiClient {
   /**
-   * List all experiment watch records
+   * List all watch records
    */
   public list<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -3334,7 +3335,7 @@ export class ExperimentWatch extends HeyApiClient {
   }
 
   /**
-   * Delete an experiment watch record
+   * Delete a watch record
    */
   public delete<ThrowOnError extends boolean = false>(
     parameters: {
@@ -3368,7 +3369,7 @@ export class ExperimentWatch extends HeyApiClient {
   }
 
   /**
-   * Force refresh a watch: re-fetch wandb data and overwrite local summary/config
+   * Force refresh a watch
    */
   public refresh<ThrowOnError extends boolean = false>(
     parameters: {
