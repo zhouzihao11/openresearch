@@ -731,39 +731,91 @@ export function SessionSidePanel(props: {
                             onClick={() => {
                               dialog.show(() => (
                                 <DialogPathPicker
-                                  title="Select Article"
+                                  title="Select Articles"
                                   mode="files"
+                                  multiple={true}
                                   acceptExt={[".pdf"]}
-                                  onSelect={async (path: string | string[]) => {
-                                    const selectedPath = Array.isArray(path) ? path[0] : path
-                                    if (!selectedPath) return
+                                  validateSelection={async (paths: string[]) => {
+                                    const rpId = researchProject()?.research_project_id
+                                    if (!rpId) return { valid: false, error: "Research project not found" }
+
+                                    const projectInfo = sync.project
+                                    if (!projectInfo) return { valid: false, error: "Project info not found" }
+
+                                    const articlesDir = `${projectInfo.worktree}/articles`
+
+                                    // Get list of existing files in articles directory
+                                    let existingFiles: string[] = []
                                     try {
-                                      const rpId = researchProject()?.research_project_id
-                                      if (!rpId) return
-                                      await sdk.client.research.article.create({
-                                        researchProjectId: rpId,
-                                        sourcePath: selectedPath,
-                                      })
-                                      // Refresh file tree to show new article
-                                      await file.tree.refresh("")
-                                    } catch (error: any) {
-                                      console.error("Failed to add article:", error)
-                                      // Check if it's a duplicate file error
-                                      const errorMsg = error?.message || error?.toString() || ""
-                                      if (errorMsg.includes("already exists")) {
-                                        showToast({
-                                          title: "File Already Exists",
-                                          description:
-                                            "This article has already been added to the project. Please select a different file.",
-                                          variant: "error",
-                                        })
-                                      } else {
-                                        showToast({
-                                          title: "Failed to Add Article",
-                                          description: errorMsg || "An error occurred while adding the article.",
-                                          variant: "error",
-                                        })
+                                      const result = await sdk.client.file.list({ directory: articlesDir, path: "" })
+                                      existingFiles = (result.data || [])
+                                        .filter((node) => node.type === "file")
+                                        .map((node) => node.name)
+                                    } catch (error) {
+                                      // Directory might not exist yet, which is fine
+                                      console.log("Articles directory not found, will be created")
+                                    }
+
+                                    // Check for duplicates
+                                    const duplicates: string[] = []
+                                    for (const path of paths) {
+                                      const filename = path.split("/").pop() || path
+                                      if (existingFiles.includes(filename)) {
+                                        duplicates.push(filename)
                                       }
+                                    }
+
+                                    if (duplicates.length > 0) {
+                                      return {
+                                        valid: false,
+                                        error: `以下文件已存在: ${duplicates.join(", ")}`,
+                                      }
+                                    }
+
+                                    return { valid: true }
+                                  }}
+                                  onSelect={async (paths: string | string[]) => {
+                                    const selectedPaths = Array.isArray(paths) ? paths : [paths]
+                                    if (selectedPaths.length === 0) return
+
+                                    const rpId = researchProject()?.research_project_id
+                                    if (!rpId) return
+
+                                    // Add all articles
+                                    let successCount = 0
+                                    let errorCount = 0
+                                    for (const path of selectedPaths) {
+                                      try {
+                                        await sdk.client.research.article.create({
+                                          researchProjectId: rpId,
+                                          sourcePath: path,
+                                        })
+                                        successCount++
+                                      } catch (error: any) {
+                                        errorCount++
+                                        console.error("Failed to add article:", error)
+                                      }
+                                    }
+
+                                    // Refresh file tree to show new articles
+                                    await file.tree.refresh("")
+                                    // Also refresh the articles directory specifically
+                                    await file.tree.refresh("articles")
+
+                                    // Show result
+                                    if (successCount > 0) {
+                                      showToast({
+                                        title: "Articles Added",
+                                        description: `Successfully added ${successCount} article(s)`,
+                                        variant: "success",
+                                      })
+                                    }
+                                    if (errorCount > 0) {
+                                      showToast({
+                                        title: "Some Articles Failed",
+                                        description: `Failed to add ${errorCount} article(s)`,
+                                        variant: "error",
+                                      })
                                     }
                                   }}
                                   onClose={() => {

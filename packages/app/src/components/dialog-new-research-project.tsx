@@ -43,6 +43,7 @@ export type PathPickerProps = {
   startDir?: () => string | undefined
   onSelect: (value: string | string[]) => void
   onClose: () => void
+  validateSelection?: (paths: string[]) => Promise<{ valid: boolean; error?: string }>
 }
 
 export function DialogPathPicker(props: PathPickerProps) {
@@ -50,6 +51,8 @@ export function DialogPathPicker(props: PathPickerProps) {
   const sync = useGlobalSync()
   const [filter, setFilter] = createSignal("")
   const [selected, setSelected] = createSignal<Set<string>>(new Set())
+  const [validationError, setValidationError] = createSignal<string>()
+  const [isValidating, setIsValidating] = createSignal(false)
 
   const home = createMemo(() => props.startDir?.() || sync.data.path.home || sync.data.path.directory || "/")
   const [cwd, setCwd] = createSignal("")
@@ -133,17 +136,39 @@ export function DialogPathPicker(props: PathPickerProps) {
       else next.add(item.path)
       return next
     })
+
+    // Clear validation error when selection changes
+    setValidationError(undefined)
   }
 
-  const confirm = () => {
+  const confirm = async () => {
     const base = Array.from(selected())
     if (base.length === 0) return
+
+    // Validate selection if validator is provided
+    if (props.validateSelection) {
+      setIsValidating(true)
+      try {
+        const result = await props.validateSelection(base)
+        setIsValidating(false)
+        if (!result.valid) {
+          setValidationError(result.error || "Invalid selection")
+          return
+        }
+      } catch (error) {
+        setIsValidating(false)
+        setValidationError("Validation failed")
+        return
+      }
+    }
+
     props.onSelect(props.multiple ? base : base[0])
     props.onClose()
   }
 
   const cancel = () => {
     setSelected(new Set<string>())
+    setValidationError(undefined)
     props.onClose()
   }
 
@@ -188,12 +213,15 @@ export function DialogPathPicker(props: PathPickerProps) {
         </List>
 
         <Show when={props.multiple}>
+          <Show when={validationError()}>
+            <div class="text-12-regular text-icon-critical-base px-2">{validationError()}</div>
+          </Show>
           <div class="flex justify-end gap-2 pt-2">
             <Button variant="ghost" onClick={cancel}>
               取消
             </Button>
-            <Button onClick={confirm} disabled={selected().size === 0}>
-              确认选择 ({selected().size})
+            <Button onClick={confirm} disabled={selected().size === 0 || isValidating() || !!validationError()}>
+              {isValidating() ? "验证中..." : `确认选择 (${selected().size})`}
             </Button>
           </div>
         </Show>
