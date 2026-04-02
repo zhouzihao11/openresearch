@@ -3,6 +3,7 @@ import { Dialog } from "@opencode-ai/ui/dialog"
 import { List } from "@opencode-ai/ui/list"
 import { TextField } from "@opencode-ai/ui/text-field"
 import { FileIcon } from "@opencode-ai/ui/file-icon"
+import { Icon } from "@opencode-ai/ui/icon"
 import { base64Encode } from "@opencode-ai/util/encode"
 import { getFilename } from "@opencode-ai/util/path"
 import { useNavigate } from "@solidjs/router"
@@ -177,7 +178,7 @@ export function DialogPathPicker(props: PathPickerProps) {
       <div class="flex flex-col gap-3 p-4 min-h-0 flex-1">
         <div class="flex items-center gap-2 shrink-0">
           <Button variant="ghost" onClick={goUp} disabled={cwd() === "/"} class="shrink-0 px-2">
-            ..
+            <Icon name="arrow-up" size="small" />
           </Button>
           <div class="text-12-regular text-text-weak truncate flex-1">{cwd()}</div>
         </div>
