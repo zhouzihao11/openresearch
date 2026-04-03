@@ -350,6 +350,8 @@ export const dict = {
   "dialog.project.delete.title": "Delete project",
   "dialog.project.delete.confirm": 'Delete project "{{name}}"?',
   "dialog.project.delete.description": "This permanently removes the project's sessions and related local metadata.",
+  "dialog.project.delete.removeLocal": "Also delete project folder",
+  "dialog.project.delete.removeLocal.description": "Warning: This will permanently delete all project files on disk",
 
   "dialog.releaseNotes.action.getStarted": "Get started",
   "dialog.releaseNotes.action.next": "Next",

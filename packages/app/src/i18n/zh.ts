@@ -361,6 +361,8 @@ export const dict = {
   "dialog.project.delete.title": "删除项目",
   "dialog.project.delete.confirm": '删除项目 "{{name}}"？',
   "dialog.project.delete.description": "这会永久删除该项目的会话和相关本地元数据。",
+  "dialog.project.delete.removeLocal": "同时删除项目文件夹",
+  "dialog.project.delete.removeLocal.description": "警告：这将永久删除磁盘上的所有项目文件",
 
   "context.breakdown.title": "上下文拆分",
   "context.breakdown.note": "输入 token 的大致拆分。“其他”包含工具定义和开销。",

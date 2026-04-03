@@ -23,6 +23,7 @@ import { IconButton } from "@opencode-ai/ui/icon-button"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
 import { Dialog } from "@opencode-ai/ui/dialog"
+import { Checkbox } from "@opencode-ai/ui/checkbox"
 import { getFilename } from "@opencode-ai/util/path"
 import { Session, type Message } from "@opencode-ai/sdk/v2/client"
 import { usePlatform } from "@/context/platform"
@@ -1374,7 +1375,7 @@ export default function Layout(props: ParentProps) {
     }
   }
 
-  async function deleteProject(project: LocalProject) {
+  async function deleteProject(project: LocalProject, removeLocal: boolean = false) {
     if (!project.id) return false
 
     const global = project.id === "global"
@@ -1419,8 +1420,8 @@ export default function Layout(props: ParentProps) {
       throwOnError: true,
     }).project
     const input = global
-      ? { projectID: project.id, directory: root, removeLocal: "true" as const }
-      : { projectID: project.id, removeLocal: "true" as const }
+      ? { projectID: project.id, directory: root, removeLocal: removeLocal ? ("true" as const) : ("false" as const) }
+      : { projectID: project.id, removeLocal: removeLocal ? ("true" as const) : ("false" as const) }
     const matched = list.filter(match)
     const shift = () => {
       notification.project.markViewed(project.worktree)
@@ -1728,13 +1729,14 @@ export default function Layout(props: ParentProps) {
     const name = createMemo(() => displayName(props.project))
     const [state, setState] = createStore({
       deleting: false,
+      removeLocal: false,
     })
 
     const handleDelete = async () => {
       if (state.deleting) return
       setState("deleting", true)
       dialog.close()
-      const deleted = await deleteProject(props.project)
+      const deleted = await deleteProject(props.project, state.removeLocal)
       if (!deleted) setState("deleting", false)
     }
 
@@ -1746,6 +1748,17 @@ export default function Layout(props: ParentProps) {
               {language.t("dialog.project.delete.confirm", { name: name() })}
             </span>
             <span class="text-12-regular text-text-weak">{language.t("dialog.project.delete.description")}</span>
+          </div>
+          <div class="flex flex-col gap-2">
+            <label class="flex items-start gap-2 cursor-pointer">
+              <Checkbox checked={state.removeLocal} onChange={(checked) => setState("removeLocal", checked)} />
+              <div class="flex flex-col gap-0.5">
+                <span class="text-13-regular text-text-strong">{language.t("dialog.project.delete.removeLocal")}</span>
+                <span class="text-12-regular text-text-weak">
+                  {language.t("dialog.project.delete.removeLocal.description")}
+                </span>
+              </div>
+            </label>
           </div>
           <div class="flex justify-end gap-2">
             <Button variant="ghost" size="large" onClick={() => dialog.close()}>
