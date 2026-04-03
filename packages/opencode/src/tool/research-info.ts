@@ -6,7 +6,7 @@ import { ArticleTable, AtomTable } from "../research/research.sql"
 
 export const ResearchInfoTool = Tool.define("research_info", {
   description:
-    "View the current research project information, including background path, goal path, article count, and atom count.",
+    "View the current research project information, including background path, goal path, macro table path, article count, and atom count.",
   parameters: z.object({}),
   async execute(_params, ctx) {
     const researchProjectId = await Research.getResearchProjectId(ctx.sessionID)
@@ -40,6 +40,7 @@ export const ResearchInfoTool = Tool.define("research_info", {
       `project_id: ${project.project_id}`,
       `background_path: ${project.background_path ?? "(not set)"}`,
       `goal_path: ${project.goal_path ?? "(not set)"}`,
+      `macro_table_path: ${project.macro_table_path ?? "(not set)"}`,
       `time_created: ${project.time_created}`,
       `time_updated: ${project.time_updated}`,
       "",

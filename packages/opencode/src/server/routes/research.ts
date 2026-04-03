@@ -230,6 +230,7 @@ const researchProjectSchema = z.object({
   project_id: z.string(),
   background_path: z.string().nullable(),
   goal_path: z.string().nullable(),
+  macro_table_path: z.string().nullable(),
   time_created: z.number(),
   time_updated: z.number(),
 })
@@ -721,6 +722,7 @@ export const ResearchRoutes = new Hono()
                   articles: z.array(z.object({ article_id: z.string(), path: z.string() })),
                   background_path: z.string().nullable(),
                   goal_path: z.string().nullable(),
+                  macro_table_path: z.string().nullable(),
                 }),
               ),
             },
@@ -848,6 +850,7 @@ export const ResearchRoutes = new Hono()
               project_id: project.project.id,
               background_path: backgroundDest ?? null,
               goal_path: goalDest ?? null,
+              macro_table_path: null,
               time_created: now,
               time_updated: now,
             })
@@ -870,6 +873,7 @@ export const ResearchRoutes = new Hono()
           articles: articles.map((a) => ({ article_id: a.article_id, path: a.path })),
           background_path: backgroundDest ?? null,
           goal_path: goalDest ?? null,
+          macro_table_path: null,
         }
       })
 

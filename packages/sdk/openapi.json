@@ -4157,6 +4157,16 @@
                         }
                       ]
                     },
+                    "macro_table_path": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "time_created": {
                       "type": "number"
                     },
@@ -4169,6 +4179,7 @@
                     "project_id",
                     "background_path",
                     "goal_path",
+                    "macro_table_path",
                     "time_created",
                     "time_updated"
                   ]
@@ -5086,9 +5097,26 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "macro_table_path": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
-                  "required": ["project_id", "research_project_id", "articles", "background_path", "goal_path"]
+                  "required": [
+                    "project_id",
+                    "research_project_id",
+                    "articles",
+                    "background_path",
+                    "goal_path",
+                    "macro_table_path"
+                  ]
                 }
               }
             }

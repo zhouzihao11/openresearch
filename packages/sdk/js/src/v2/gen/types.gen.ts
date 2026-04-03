@@ -3850,6 +3850,7 @@ export type ResearchProjectGetResponses = {
     project_id: string
     background_path: string | null
     goal_path: string | null
+    macro_table_path: string | null
     time_created: number
     time_updated: number
   }
@@ -4166,6 +4167,7 @@ export type ResearchProjectCreateResponses = {
     }>
     background_path: string | null
     goal_path: string | null
+    macro_table_path: string | null
   }
 }
 

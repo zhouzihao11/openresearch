@@ -31,6 +31,7 @@ export const ResearchProjectTable = sqliteTable(
       .references(() => ProjectTable.id, { onDelete: "cascade" }),
     background_path: text(),
     goal_path: text(),
+    macro_table_path: text(),
     ...Timestamps,
   },
   (table) => [uniqueIndex("research_project_project_idx").on(table.project_id)],

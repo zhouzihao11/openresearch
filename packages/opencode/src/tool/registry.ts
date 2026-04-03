@@ -44,7 +44,7 @@ import {
 } from "./atom"
 import { ExperimentCreateTool } from "./experiment"
 import { ExperimentQueryTool } from "./experiment-query"
-import { ResearchBackgroundTool, ResearchGoalTool } from "./research-background"
+import { ResearchBackgroundTool, ResearchGoalTool, ResearchMacroTool } from "./research-background"
 import { ResearchInfoTool } from "./research-info"
 import { SshTool } from "./ssh"
 import { ExperimentWatchTool } from "./experiment-watch"
@@ -160,6 +160,7 @@ export namespace ToolRegistry {
       ExperimentQueryTool,
       ResearchBackgroundTool,
       ResearchGoalTool,
+      ResearchMacroTool,
       ResearchInfoTool,
       SshTool,
       ExperimentWatchTool,

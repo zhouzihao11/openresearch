@@ -69,4 +69,14 @@ export namespace Research {
         .run(),
     )
   }
+
+  export function updateMacroTablePath(researchProjectId: string, macroTablePath: string) {
+    Database.use((db) =>
+      db
+        .update(ResearchProjectTable)
+        .set({ macro_table_path: macroTablePath, time_updated: Date.now() })
+        .where(eq(ResearchProjectTable.research_project_id, researchProjectId))
+        .run(),
+    )
+  }
 }
