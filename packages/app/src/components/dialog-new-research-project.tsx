@@ -260,7 +260,13 @@ export function DialogPathPicker(props: PathPickerProps) {
         </div>
 
         <div class="shrink-0">
-          <TextField label={language.t("pathPicker.search")} placeholder={language.t("pathPicker.search.placeholder")} value={filter()} onChange={setFilter} autoFocus />
+          <TextField
+            label={language.t("pathPicker.search")}
+            placeholder={language.t("pathPicker.search.placeholder")}
+            value={filter()}
+            onChange={setFilter}
+            autoFocus
+          />
         </div>
 
         <List
@@ -305,7 +311,9 @@ export function DialogPathPicker(props: PathPickerProps) {
             {language.t("pathPicker.cancel")}
           </Button>
           <Button onClick={confirm} disabled={selected().size === 0 || isValidating() || !!validationError()}>
-            {isValidating() ? language.t("pathPicker.validating") : language.t("pathPicker.confirm", { count: String(selected().size) })}
+            {isValidating()
+              ? language.t("pathPicker.validating")
+              : language.t("pathPicker.confirm", { count: String(selected().size) })}
           </Button>
         </div>
       </div>
@@ -475,7 +483,9 @@ export function DialogNewResearchProject(props: DialogNewResearchProjectProps) {
               />
             </div>
             <div class="py-3">
-              <label class="text-12-medium text-text-weak mb-1.5 block">{language.t("research.new.location.label")}</label>
+              <label class="text-12-medium text-text-weak mb-1.5 block">
+                {language.t("research.new.location.label")}
+              </label>
               <div class="flex items-center gap-2">
                 <TextField
                   value={targetDir()}

@@ -41,7 +41,7 @@ function row(input: { expId?: string; watchId?: string }) {
 }
 
 export namespace ExperimentExecutionWatch {
-  export function createOrGet(expId: string, title: string) {
+  export function createOrGet(expId: string, title: string, stage: ExecutionStage = "planning") {
     const existing = row({ expId })
     if (existing) return existing
     const now = Date.now()
@@ -53,7 +53,7 @@ export namespace ExperimentExecutionWatch {
           watch_id: watchId,
           exp_id: expId,
           status: "pending",
-          stage: "planning",
+          stage,
           title,
           started_at: now,
           time_created: now,

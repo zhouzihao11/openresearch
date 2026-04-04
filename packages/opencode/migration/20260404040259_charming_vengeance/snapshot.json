@@ -1,8 +1,8 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "db545ca8-5dbe-41c6-b3ee-75cbcdc336b0",
-  "prevIds": ["3cf55be4-29c3-4a93-a262-e639134fbdec"],
+  "id": "b23d39ab-4357-49cf-ad21-27aee87ca37e",
+  "prevIds": ["df95dc51-c4fe-4f02-b1c5-fdffdc438dbf"],
   "ddl": [
     {
       "name": "workspace",
@@ -26,6 +26,10 @@
     },
     {
       "name": "atom",
+      "entityType": "tables"
+    },
+    {
+      "name": "code",
       "entityType": "tables"
     },
     {
@@ -372,16 +376,6 @@
       "autoincrement": false,
       "default": null,
       "generated": null,
-      "name": "code_path",
-      "entityType": "columns",
-      "table": "article"
-    },
-    {
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
       "name": "title",
       "entityType": "columns",
       "table": "article"
@@ -615,6 +609,66 @@
       "name": "time_updated",
       "entityType": "columns",
       "table": "atom"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "code_id",
+      "entityType": "columns",
+      "table": "code"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "research_project_id",
+      "entityType": "columns",
+      "table": "code"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "code_name",
+      "entityType": "columns",
+      "table": "code"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "article_id",
+      "entityType": "columns",
+      "table": "code"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "time_created",
+      "entityType": "columns",
+      "table": "code"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "time_updated",
+      "entityType": "columns",
+      "table": "code"
     },
     {
       "type": "text",
@@ -1287,6 +1341,16 @@
       "table": "research_project"
     },
     {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "macro_table_path",
+      "entityType": "columns",
+      "table": "research_project"
+    },
+    {
       "type": "integer",
       "notNull": true,
       "autoincrement": false,
@@ -1854,6 +1918,28 @@
       "table": "atom"
     },
     {
+      "columns": ["research_project_id"],
+      "tableTo": "research_project",
+      "columnsTo": ["research_project_id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "fk_code_research_project_id_research_project_research_project_id_fk",
+      "entityType": "fks",
+      "table": "code"
+    },
+    {
+      "columns": ["article_id"],
+      "tableTo": "article",
+      "columnsTo": ["article_id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "nameExplicit": false,
+      "name": "fk_code_article_id_article_article_id_fk",
+      "entityType": "fks",
+      "table": "code"
+    },
+    {
       "columns": ["exp_id"],
       "tableTo": "experiment",
       "columnsTo": ["exp_id"],
@@ -2057,6 +2143,13 @@
       "entityType": "pks"
     },
     {
+      "columns": ["code_id"],
+      "nameExplicit": false,
+      "name": "code_pk",
+      "table": "code",
+      "entityType": "pks"
+    },
+    {
       "columns": ["watch_id"],
       "nameExplicit": false,
       "name": "experiment_execution_watch_pk",
@@ -2188,6 +2281,34 @@
       "name": "atom_session_idx",
       "entityType": "indexes",
       "table": "atom"
+    },
+    {
+      "columns": [
+        {
+          "value": "research_project_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "code_research_project_idx",
+      "entityType": "indexes",
+      "table": "code"
+    },
+    {
+      "columns": [
+        {
+          "value": "article_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "code_article_idx",
+      "entityType": "indexes",
+      "table": "code"
     },
     {
       "columns": [

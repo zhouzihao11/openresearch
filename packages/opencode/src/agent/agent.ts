@@ -15,7 +15,6 @@ import PROMPT_RESEARCH from "./prompt/research.txt"
 import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
 import PROMPT_RESEARCH_PROJECT_INIT from "./prompt/research_project_init.txt"
-import PROMPT_ARTICLE_CODE_ATTACH from "./prompt/article_code_attach.txt"
 import PROMPT_EXPERIMENT from "./prompt/experiment.txt"
 import PROMPT_EXPERIMENT_COMMIT from "./prompt/experiment_commit.txt"
 import PROMPT_EXPERIMENT_PLAN from "./prompt/experiment_plan.txt"
@@ -77,7 +76,6 @@ export namespace Agent {
         ...Object.fromEntries(whitelistedDirs.map((dir) => [dir, "allow"])),
       },
       research_doc_edit: "ask",
-      article_code_attach: "deny",
       question: "deny",
       plan_enter: "deny",
       plan_exit: "deny",
@@ -400,28 +398,6 @@ export namespace Agent {
             write: "allow",
             apply_patch: "allow",
             research_doc_edit: "ask",
-          }),
-          user,
-        ),
-        options: {},
-        mode: "subagent",
-        native: true,
-      },
-      article_code_attach: {
-        name: "article_code_attach",
-        description:
-          "Attach source code to a research article. Accepts a GitHub URL or local path from the user, or automatically searches the article PDF and the web for the code repository.",
-        prompt: PROMPT_ARTICLE_CODE_ATTACH,
-        permission: PermissionNext.merge(
-          defaults,
-          PermissionNext.fromConfig({
-            "*": "deny",
-            article_query: "allow",
-            article_code_attach: "allow",
-            read: "allow",
-            question: "allow",
-            websearch: "allow",
-            webfetch: "allow",
           }),
           user,
         ),

@@ -5414,6 +5414,87 @@
         ]
       }
     },
+    "/research/project/{researchProjectId}/articles": {
+      "get": {
+        "operationId": "research.article.list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workspace",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "researchProjectId",
+            "required": true
+          }
+        ],
+        "summary": "List articles for a research project",
+        "description": "Return article IDs and file names for a research project, useful for dropdown selectors.",
+        "responses": {
+          "200": {
+            "description": "List of articles",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "article_id": {
+                        "type": "string"
+                      },
+                      "filename": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": ["article_id", "filename", "title"]
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.research.article.list({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/research/project/{researchProjectId}/article": {
       "post": {
         "operationId": "research.article.create",
@@ -5729,6 +5810,9 @@
                                   "research_project_id": {
                                     "type": "string"
                                   },
+                                  "exp_name": {
+                                    "type": "string"
+                                  },
                                   "exp_session_id": {
                                     "anyOf": [
                                       {
@@ -5880,6 +5964,7 @@
                                 "required": [
                                   "exp_id",
                                   "research_project_id",
+                                  "exp_name",
                                   "exp_session_id",
                                   "baseline_branch_name",
                                   "exp_branch_name",
@@ -6009,6 +6094,469 @@
         ]
       }
     },
+    "/research/branches": {
+      "get": {
+        "operationId": "research.branches",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workspace",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "codePath",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          }
+        ],
+        "summary": "List git branches for a code path",
+        "description": "List local git branches under the given code path. If a branch is associated with an experiment, returns the experiment name as displayName.",
+        "responses": {
+          "200": {
+            "description": "List of branches",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "branch": {
+                        "type": "string"
+                      },
+                      "displayName": {
+                        "type": "string"
+                      },
+                      "experimentId": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": ["branch", "displayName", "experimentId"]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.research.branches({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/research/project/{researchProjectId}/codes": {
+      "get": {
+        "operationId": "research.code.list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workspace",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "researchProjectId",
+            "required": true
+          }
+        ],
+        "summary": "List codes for a research project",
+        "description": "Query all code records belonging to a research project.",
+        "responses": {
+          "200": {
+            "description": "List of code records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "code_id": {
+                        "type": "string"
+                      },
+                      "research_project_id": {
+                        "type": "string"
+                      },
+                      "code_name": {
+                        "type": "string"
+                      },
+                      "article_id": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "time_created": {
+                        "type": "number"
+                      },
+                      "time_updated": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "code_id",
+                      "research_project_id",
+                      "code_name",
+                      "article_id",
+                      "time_created",
+                      "time_updated"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.research.code.list({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/research/code/{codeId}": {
+      "get": {
+        "operationId": "research.code.get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workspace",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "codeId",
+            "required": true
+          }
+        ],
+        "summary": "Get a code record",
+        "description": "Get a single code record by its ID.",
+        "responses": {
+          "200": {
+            "description": "Code record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code_id": {
+                      "type": "string"
+                    },
+                    "research_project_id": {
+                      "type": "string"
+                    },
+                    "code_name": {
+                      "type": "string"
+                    },
+                    "article_id": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "time_created": {
+                      "type": "number"
+                    },
+                    "time_updated": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "code_id",
+                    "research_project_id",
+                    "code_name",
+                    "article_id",
+                    "time_created",
+                    "time_updated"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.research.code.get({\n  ...\n})"
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "research.code.delete",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workspace",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "codeId",
+            "required": true
+          }
+        ],
+        "summary": "Delete a code record",
+        "description": "Delete a code record and its directory on disk.",
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["success"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.research.code.delete({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/research/project/{researchProjectId}/code": {
+      "post": {
+        "operationId": "research.code.create",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workspace",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "researchProjectId",
+            "required": true
+          }
+        ],
+        "summary": "Create a code record",
+        "description": "Clone a GitHub repository or copy a local directory into the project's code/ directory, and create a code record.",
+        "responses": {
+          "200": {
+            "description": "Created code record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code_id": {
+                      "type": "string"
+                    },
+                    "research_project_id": {
+                      "type": "string"
+                    },
+                    "code_name": {
+                      "type": "string"
+                    },
+                    "article_id": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "time_created": {
+                      "type": "number"
+                    },
+                    "time_updated": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "code_id",
+                    "research_project_id",
+                    "code_name",
+                    "article_id",
+                    "time_created",
+                    "time_updated"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "codeName": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "source": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "articleId": {
+                    "type": "string"
+                  }
+                },
+                "required": ["codeName", "source"]
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.research.code.create({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/research/experiment": {
       "post": {
         "operationId": "research.experiment.create",
@@ -6041,6 +6589,9 @@
                     "exp_id": {
                       "type": "string"
                     },
+                    "exp_name": {
+                      "type": "string"
+                    },
                     "atom_id": {
                       "type": "string"
                     },
@@ -6065,6 +6616,7 @@
                   },
                   "required": [
                     "exp_id",
+                    "exp_name",
                     "atom_id",
                     "atom_name",
                     "session_id",
@@ -6108,6 +6660,10 @@
                     "type": "string",
                     "minLength": 1
                   },
+                  "expName": {
+                    "type": "string",
+                    "minLength": 1
+                  },
                   "baselineBranch": {
                     "default": "master",
                     "type": "string"
@@ -6120,7 +6676,7 @@
                     "minLength": 1
                   }
                 },
-                "required": ["atomId", "codePath"]
+                "required": ["atomId", "expName", "codePath"]
               }
             }
           }
@@ -6129,6 +6685,74 @@
           {
             "lang": "js",
             "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.research.experiment.create({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/research/experiment/{expId}/session": {
+      "post": {
+        "operationId": "research.experiment.session.create",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workspace",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "expId",
+            "required": true
+          }
+        ],
+        "summary": "Create or get session for an experiment",
+        "description": "If the experiment already has a session that is not archived, returns its session ID. Otherwise creates a new session and binds it to the experiment.",
+        "responses": {
+          "200": {
+            "description": "Session ID for the experiment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "session_id": {
+                      "type": "string"
+                    },
+                    "created": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["session_id", "created"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.research.experiment.session.create({\n  ...\n})"
           }
         ]
       }
@@ -6314,6 +6938,9 @@
                           "type": "string"
                         },
                         "research_project_id": {
+                          "type": "string"
+                        },
+                        "exp_name": {
                           "type": "string"
                         },
                         "exp_session_id": {
@@ -6578,16 +7205,6 @@
                                 "path": {
                                   "type": "string"
                                 },
-                                "code_path": {
-                                  "anyOf": [
-                                    {
-                                      "type": "string"
-                                    },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ]
-                                },
                                 "title": {
                                   "anyOf": [
                                     {
@@ -6623,7 +7240,6 @@
                                 "article_id",
                                 "research_project_id",
                                 "path",
-                                "code_path",
                                 "title",
                                 "source_url",
                                 "status",
@@ -6640,6 +7256,7 @@
                       "required": [
                         "exp_id",
                         "research_project_id",
+                        "exp_name",
                         "exp_session_id",
                         "baseline_branch_name",
                         "exp_branch_name",
@@ -6879,6 +7496,9 @@
                                 "exp_id": {
                                   "type": "string"
                                 },
+                                "exp_name": {
+                                  "type": "string"
+                                },
                                 "exp_session_id": {
                                   "anyOf": [
                                     {
@@ -6894,7 +7514,7 @@
                                   "enum": ["pending", "running", "done", "idle", "failed"]
                                 }
                               },
-                              "required": ["exp_id", "exp_session_id", "status"]
+                              "required": ["exp_id", "exp_name", "exp_session_id", "status"]
                             }
                           }
                         },
@@ -7736,6 +8356,9 @@
                     "research_project_id": {
                       "type": "string"
                     },
+                    "exp_name": {
+                      "type": "string"
+                    },
                     "exp_session_id": {
                       "anyOf": [
                         {
@@ -7887,6 +8510,7 @@
                   "required": [
                     "exp_id",
                     "research_project_id",
+                    "exp_name",
                     "exp_session_id",
                     "baseline_branch_name",
                     "exp_branch_name",
@@ -7924,6 +8548,9 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "expName": {
+                    "type": "string"
+                  },
                   "baselineBranch": {
                     "type": "string"
                   },

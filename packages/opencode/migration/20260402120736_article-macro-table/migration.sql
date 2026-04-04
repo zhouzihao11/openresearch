@@ -1,1 +1,0 @@
-ALTER TABLE `article` ADD `macro_table_path` text;

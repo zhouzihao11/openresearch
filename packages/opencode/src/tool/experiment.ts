@@ -6,6 +6,8 @@ import { AtomTable, ExperimentTable, RemoteServerTable } from "../research/resea
 import { Research } from "../research/research"
 import { Instance } from "../project/instance"
 import { Filesystem } from "../util/filesystem"
+import { git } from "../util/git"
+import { ExperimentExecutionWatch } from "../research/experiment-execution-watch"
 import { Session } from "@/session"
 
 export const ExperimentCreateTool = Tool.define("experiment_create", {
@@ -14,6 +16,7 @@ export const ExperimentCreateTool = Tool.define("experiment_create", {
     "This will create a dedicated session, set up result paths, and link the experiment to the atom.",
   parameters: z.object({
     atomId: z.string().describe("The atom ID to create an experiment for"),
+    expName: z.string().describe("A human-readable name for the experiment"),
     baselineBranch: z
       .string()
       .optional()
@@ -42,7 +45,7 @@ export const ExperimentCreateTool = Tool.define("experiment_create", {
     }
 
     const expId = crypto.randomUUID()
-    const session = await Session.create({ title: `Exp: ${atom.atom_name}` })
+    const session = await Session.create({ title: `Exp: ${params.expName}` })
 
     const expDir = path.join(Instance.directory, "exp_results", expId)
     const expResultPath = path.join(expDir, "result.wandb")
@@ -52,6 +55,24 @@ export const ExperimentCreateTool = Tool.define("experiment_create", {
     await Filesystem.write(path.join(expDir, ".keep"), "")
     await Filesystem.write(expPlanPath, "")
 
+    // Create experiment branch from baseline without switching
+    const baselineExists = await git(["rev-parse", "--verify", params.baselineBranch], { cwd: params.codePath })
+    if (baselineExists.exitCode !== 0) {
+      return {
+        title: "Failed",
+        output: `Baseline branch "${params.baselineBranch}" not found at ${params.codePath}`,
+        metadata: { expId: undefined as string | undefined },
+      }
+    }
+    const createBranch = await git(["branch", expId, params.baselineBranch], { cwd: params.codePath })
+    if (createBranch.exitCode !== 0) {
+      return {
+        title: "Failed",
+        output: `Failed to create branch ${expId} from ${params.baselineBranch}: ${createBranch.stderr?.toString().trim() || "unknown error"}`,
+        metadata: { expId: undefined as string | undefined },
+      }
+    }
+
     const now = Date.now()
     Database.use((db) =>
       db
@@ -59,6 +80,7 @@ export const ExperimentCreateTool = Tool.define("experiment_create", {
         .values({
           exp_id: expId,
           research_project_id: researchProjectId,
+          exp_name: params.expName,
           atom_id: params.atomId,
           exp_session_id: session.id,
           baseline_branch_name: params.baselineBranch,
@@ -74,6 +96,8 @@ export const ExperimentCreateTool = Tool.define("experiment_create", {
         })
         .run(),
     )
+
+    ExperimentExecutionWatch.createOrGet(expId, `${params.expName} for ${atom.atom_name}`, "pending")
 
     let remoteServerConfig: string | null = null
     if (params.remoteServerId) {

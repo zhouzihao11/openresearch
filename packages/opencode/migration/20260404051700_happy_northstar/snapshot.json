@@ -1,8 +1,8 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "b2f507d7-c652-4eb2-9ab2-b4cdd1dad46b",
-  "prevIds": ["df95dc51-c4fe-4f02-b1c5-fdffdc438dbf"],
+  "id": "1629ddff-b3e6-4703-a8a7-182b84ab9ccb",
+  "prevIds": ["b23d39ab-4357-49cf-ad21-27aee87ca37e"],
   "ddl": [
     {
       "name": "workspace",
@@ -29,11 +29,23 @@
       "entityType": "tables"
     },
     {
+      "name": "code",
+      "entityType": "tables"
+    },
+    {
+      "name": "experiment_execution_watch",
+      "entityType": "tables"
+    },
+    {
       "name": "experiment",
       "entityType": "tables"
     },
     {
       "name": "experiment_watch",
+      "entityType": "tables"
+    },
+    {
+      "name": "local_download_watch",
       "entityType": "tables"
     },
     {
@@ -364,26 +376,6 @@
       "autoincrement": false,
       "default": null,
       "generated": null,
-      "name": "code_path",
-      "entityType": "columns",
-      "table": "article"
-    },
-    {
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "name": "macro_table_path",
-      "entityType": "columns",
-      "table": "article"
-    },
-    {
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
       "name": "title",
       "entityType": "columns",
       "table": "article"
@@ -624,6 +616,206 @@
       "autoincrement": false,
       "default": null,
       "generated": null,
+      "name": "code_id",
+      "entityType": "columns",
+      "table": "code"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "research_project_id",
+      "entityType": "columns",
+      "table": "code"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "code_name",
+      "entityType": "columns",
+      "table": "code"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "article_id",
+      "entityType": "columns",
+      "table": "code"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "time_created",
+      "entityType": "columns",
+      "table": "code"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "time_updated",
+      "entityType": "columns",
+      "table": "code"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "watch_id",
+      "entityType": "columns",
+      "table": "experiment_execution_watch"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "exp_id",
+      "entityType": "columns",
+      "table": "experiment_execution_watch"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'pending'",
+      "generated": null,
+      "name": "status",
+      "entityType": "columns",
+      "table": "experiment_execution_watch"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'planning'",
+      "generated": null,
+      "name": "stage",
+      "entityType": "columns",
+      "table": "experiment_execution_watch"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "title",
+      "entityType": "columns",
+      "table": "experiment_execution_watch"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "message",
+      "entityType": "columns",
+      "table": "experiment_execution_watch"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "wandb_entity",
+      "entityType": "columns",
+      "table": "experiment_execution_watch"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "wandb_project",
+      "entityType": "columns",
+      "table": "experiment_execution_watch"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "wandb_run_id",
+      "entityType": "columns",
+      "table": "experiment_execution_watch"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "error_message",
+      "entityType": "columns",
+      "table": "experiment_execution_watch"
+    },
+    {
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "started_at",
+      "entityType": "columns",
+      "table": "experiment_execution_watch"
+    },
+    {
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "finished_at",
+      "entityType": "columns",
+      "table": "experiment_execution_watch"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "time_created",
+      "entityType": "columns",
+      "table": "experiment_execution_watch"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "time_updated",
+      "entityType": "columns",
+      "table": "experiment_execution_watch"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
       "name": "exp_id",
       "entityType": "columns",
       "table": "experiment"
@@ -635,6 +827,16 @@
       "default": null,
       "generated": null,
       "name": "research_project_id",
+      "entityType": "columns",
+      "table": "experiment"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "exp_name",
       "entityType": "columns",
       "table": "experiment"
     },
@@ -904,6 +1106,176 @@
       "autoincrement": false,
       "default": null,
       "generated": null,
+      "name": "watch_id",
+      "entityType": "columns",
+      "table": "local_download_watch"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "exp_id",
+      "entityType": "columns",
+      "table": "local_download_watch"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "resource_key",
+      "entityType": "columns",
+      "table": "local_download_watch"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "resource_name",
+      "entityType": "columns",
+      "table": "local_download_watch"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "resource_type",
+      "entityType": "columns",
+      "table": "local_download_watch"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'pending'",
+      "generated": null,
+      "name": "status",
+      "entityType": "columns",
+      "table": "local_download_watch"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "local_resource_root",
+      "entityType": "columns",
+      "table": "local_download_watch"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "local_path",
+      "entityType": "columns",
+      "table": "local_download_watch"
+    },
+    {
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "pid",
+      "entityType": "columns",
+      "table": "local_download_watch"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "log_path",
+      "entityType": "columns",
+      "table": "local_download_watch"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "status_path",
+      "entityType": "columns",
+      "table": "local_download_watch"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "source_selection",
+      "entityType": "columns",
+      "table": "local_download_watch"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "method",
+      "entityType": "columns",
+      "table": "local_download_watch"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "error_message",
+      "entityType": "columns",
+      "table": "local_download_watch"
+    },
+    {
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "last_polled_at",
+      "entityType": "columns",
+      "table": "local_download_watch"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "time_created",
+      "entityType": "columns",
+      "table": "local_download_watch"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "time_updated",
+      "entityType": "columns",
+      "table": "local_download_watch"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
       "name": "id",
       "entityType": "columns",
       "table": "remote_server"
@@ -975,6 +1347,16 @@
       "default": null,
       "generated": null,
       "name": "goal_path",
+      "entityType": "columns",
+      "table": "research_project"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "macro_table_path",
       "entityType": "columns",
       "table": "research_project"
     },
@@ -1552,6 +1934,39 @@
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
+      "name": "fk_code_research_project_id_research_project_research_project_id_fk",
+      "entityType": "fks",
+      "table": "code"
+    },
+    {
+      "columns": ["article_id"],
+      "tableTo": "article",
+      "columnsTo": ["article_id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "nameExplicit": false,
+      "name": "fk_code_article_id_article_article_id_fk",
+      "entityType": "fks",
+      "table": "code"
+    },
+    {
+      "columns": ["exp_id"],
+      "tableTo": "experiment",
+      "columnsTo": ["exp_id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "fk_experiment_execution_watch_exp_id_experiment_exp_id_fk",
+      "entityType": "fks",
+      "table": "experiment_execution_watch"
+    },
+    {
+      "columns": ["research_project_id"],
+      "tableTo": "research_project",
+      "columnsTo": ["research_project_id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
       "name": "fk_experiment_research_project_id_research_project_research_project_id_fk",
       "entityType": "fks",
       "table": "experiment"
@@ -1599,6 +2014,17 @@
       "name": "fk_experiment_watch_exp_id_experiment_exp_id_fk",
       "entityType": "fks",
       "table": "experiment_watch"
+    },
+    {
+      "columns": ["exp_id"],
+      "tableTo": "experiment",
+      "columnsTo": ["exp_id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "fk_local_download_watch_exp_id_experiment_exp_id_fk",
+      "entityType": "fks",
+      "table": "local_download_watch"
     },
     {
       "columns": ["project_id"],
@@ -1727,6 +2153,20 @@
       "entityType": "pks"
     },
     {
+      "columns": ["code_id"],
+      "nameExplicit": false,
+      "name": "code_pk",
+      "table": "code",
+      "entityType": "pks"
+    },
+    {
+      "columns": ["watch_id"],
+      "nameExplicit": false,
+      "name": "experiment_execution_watch_pk",
+      "table": "experiment_execution_watch",
+      "entityType": "pks"
+    },
+    {
       "columns": ["exp_id"],
       "nameExplicit": false,
       "name": "experiment_pk",
@@ -1738,6 +2178,13 @@
       "nameExplicit": false,
       "name": "experiment_watch_pk",
       "table": "experiment_watch",
+      "entityType": "pks"
+    },
+    {
+      "columns": ["watch_id"],
+      "nameExplicit": false,
+      "name": "local_download_watch_pk",
+      "table": "local_download_watch",
       "entityType": "pks"
     },
     {
@@ -1855,6 +2302,62 @@
       "isUnique": false,
       "where": null,
       "origin": "manual",
+      "name": "code_research_project_idx",
+      "entityType": "indexes",
+      "table": "code"
+    },
+    {
+      "columns": [
+        {
+          "value": "article_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "code_article_idx",
+      "entityType": "indexes",
+      "table": "code"
+    },
+    {
+      "columns": [
+        {
+          "value": "exp_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "experiment_execution_watch_exp_idx",
+      "entityType": "indexes",
+      "table": "experiment_execution_watch"
+    },
+    {
+      "columns": [
+        {
+          "value": "status",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "experiment_execution_watch_status_idx",
+      "entityType": "indexes",
+      "table": "experiment_execution_watch"
+    },
+    {
+      "columns": [
+        {
+          "value": "research_project_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
       "name": "experiment_research_project_idx",
       "entityType": "indexes",
       "table": "experiment"
@@ -1914,6 +2417,52 @@
       "name": "experiment_watch_status_idx",
       "entityType": "indexes",
       "table": "experiment_watch"
+    },
+    {
+      "columns": [
+        {
+          "value": "exp_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "local_download_watch_exp_idx",
+      "entityType": "indexes",
+      "table": "local_download_watch"
+    },
+    {
+      "columns": [
+        {
+          "value": "status",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "local_download_watch_status_idx",
+      "entityType": "indexes",
+      "table": "local_download_watch"
+    },
+    {
+      "columns": [
+        {
+          "value": "exp_id",
+          "isExpression": false
+        },
+        {
+          "value": "resource_key",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "local_download_watch_exp_resource_idx",
+      "entityType": "indexes",
+      "table": "local_download_watch"
     },
     {
       "columns": [

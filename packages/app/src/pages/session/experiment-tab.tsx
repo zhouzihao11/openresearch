@@ -32,6 +32,7 @@ interface ExperimentTabProps {
   experiment: {
     exp_id: string
     research_project_id: string
+    exp_name: string
     exp_session_id: string | null
     baseline_branch_name: string | null
     exp_branch_name: string | null
@@ -66,7 +67,6 @@ interface ExperimentTabProps {
       article_id: string
       research_project_id: string
       path: string
-      code_path: string | null
       title: string | null
       source_url: string | null
       status: "pending" | "parsed" | "failed"
@@ -477,8 +477,6 @@ export function ExpProgressTab(props: ExperimentTabProps & { onUpdated?: () => v
   const [conflicts, setConflicts] = createSignal<{ exp_id: string; exp_session_id: string | null }[]>([])
 
   // Editable fields
-  const [editingBaseline, setEditingBaseline] = createSignal(false)
-  const [baselineValue, setBaselineValue] = createSignal(props.experiment.baseline_branch_name ?? "master")
   const [editingServer, setEditingServer] = createSignal(false)
   const [serverList, setServerList] = createSignal<ServerRow[]>([])
   const [selectedServerId, setSelectedServerId] = createSignal<string | null>(props.experiment.remote_server_id ?? null)
@@ -488,14 +486,18 @@ export function ExpProgressTab(props: ExperimentTabProps & { onUpdated?: () => v
   const [currentServerConfig, setCurrentServerConfig] = createSignal<ServerConfig | null>(
     props.experiment.remote_server_config ?? null,
   )
-  const [currentBaselineBranch, setCurrentBaselineBranch] = createSignal(
-    props.experiment.baseline_branch_name ?? "master",
-  )
-
   const codePath = createMemo(() => props.experiment.code_path)
 
-  const navigateToSession = (sessionId: string) => {
-    navigate(`/${base64Encode(sdk.directory)}/session/${sessionId}`)
+  const navigateToSession = async (expId: string) => {
+    try {
+      const res = await sdk.client.research.experiment.session.create({ expId })
+      const sessionId = res.data?.session_id
+      if (sessionId) {
+        navigate(`/${base64Encode(sdk.directory)}/session/${sessionId}`)
+      }
+    } catch (err) {
+      console.error("[experiment-tab] failed to get/create experiment session", err)
+    }
   }
 
   const handleOpenInVSCode = async () => {
@@ -526,23 +528,6 @@ export function ExpProgressTab(props: ExperimentTabProps & { onUpdated?: () => v
       if (res.data) setServerList(res.data as ServerRow[])
     } catch {
       // ignore
-    }
-  }
-
-  const handleSaveBaseline = async () => {
-    setSaving(true)
-    try {
-      await sdk.client.research.experiment.update({
-        expId: props.experiment.exp_id,
-        baselineBranch: baselineValue(),
-      })
-      setCurrentBaselineBranch(baselineValue())
-      setEditingBaseline(false)
-      props.onUpdated?.()
-    } catch (e) {
-      console.error("Failed to update baseline branch", e)
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -620,49 +605,13 @@ export function ExpProgressTab(props: ExperimentTabProps & { onUpdated?: () => v
             </div>
           </Show>
 
-          {/* Baseline branch - editable */}
-          <div>
-            <div class="text-12-medium text-text-weak mb-1">{language.t("session.experiment.baseline")}</div>
-            <Show
-              when={editingBaseline()}
-              fallback={
-                <div class="flex items-center gap-2">
-                  <div class="text-14-regular font-mono">{currentBaselineBranch()}</div>
-                  <button
-                    class="text-11-regular text-text-weak hover:text-text-base transition-colors"
-                    onClick={() => {
-                      setBaselineValue(currentBaselineBranch())
-                      setEditingBaseline(true)
-                    }}
-                  >
-                    Edit
-                  </button>
-                </div>
-              }
-            >
-              <div class="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={baselineValue()}
-                  onInput={(e) => setBaselineValue(e.currentTarget.value)}
-                  class="flex-1 rounded border border-border-weak-base bg-background-stronger px-2 py-1 text-13-regular font-mono text-text-base outline-none focus:border-border-base"
-                />
-                <button
-                  disabled={saving()}
-                  onClick={handleSaveBaseline}
-                  class="px-2 py-1 rounded text-11-regular bg-background-stronger text-text-base hover:text-text-strong transition-colors disabled:opacity-50"
-                >
-                  {saving() ? "Saving..." : "Save"}
-                </button>
-                <button
-                  onClick={() => setEditingBaseline(false)}
-                  class="px-2 py-1 rounded text-11-regular text-text-weak hover:text-text-base transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </Show>
-          </div>
+          {/* Baseline branch - read-only */}
+          <Show when={props.experiment.baseline_branch_name}>
+            <div>
+              <div class="text-12-medium text-text-weak mb-1">{language.t("session.experiment.baseline")}</div>
+              <div class="text-14-regular font-mono">{props.experiment.baseline_branch_name}</div>
+            </div>
+          </Show>
 
           {/* Remote server - editable */}
           <div>
@@ -764,8 +713,7 @@ export function ExpProgressTab(props: ExperimentTabProps & { onUpdated?: () => v
                         {(c) => (
                           <button
                             class="flex items-center gap-2 px-2 py-1 rounded text-left w-full hover:bg-background-stronger transition-colors"
-                            disabled={!c.exp_session_id}
-                            onClick={() => c.exp_session_id && navigateToSession(c.exp_session_id)}
+                            onClick={() => navigateToSession(c.exp_id)}
                           >
                             <span class="w-2 h-2 rounded-full shrink-0 bg-surface-info-base" />
                             <span class="text-12-regular text-text-base font-mono">{c.exp_id.slice(0, 8)}</span>

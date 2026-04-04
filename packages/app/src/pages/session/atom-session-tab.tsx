@@ -7,6 +7,8 @@ import { Dialog } from "@opencode-ai/ui/dialog"
 import { TextField } from "@opencode-ai/ui/text-field"
 import { Button } from "@opencode-ai/ui/button"
 import { Select } from "@opencode-ai/ui/select"
+import { Combobox as KobalteCombobox } from "@kobalte/core/combobox"
+import { Icon } from "@opencode-ai/ui/icon"
 import { base64Encode } from "@opencode-ai/util/encode"
 import { Markdown } from "@opencode-ai/ui/markdown"
 import type { ResearchSessionAtomGetResponse } from "@opencode-ai/sdk/v2"
@@ -47,22 +49,32 @@ export function AtomSessionTab(props: {
     }
   }
 
-  const navigateToExpSession = (expSessionId: string) => {
-    navigate(`/${base64Encode(sdk.directory)}/session/${expSessionId}`)
+  const navigateToExpSession = async (expId: string) => {
+    try {
+      const res = await sdk.client.research.experiment.session.create({ expId })
+      const sessionId = res.data?.session_id
+      if (sessionId) {
+        navigate(`/${base64Encode(sdk.directory)}/session/${sessionId}`)
+      }
+    } catch (err) {
+      console.error("[atom-session-tab] failed to get/create experiment session", err)
+    }
   }
 
-  const doCreateExperiment = async (baselineBranch: string, codePath: string) => {
+  const doCreateExperiment = async (expName: string, baselineBranch: string, codePath: string) => {
     if (creating()) return
     setCreating(true)
     try {
       const res = await sdk.client.research.experiment.create({
         atomId: props.atom.atom_id,
+        expName,
         baselineBranch,
         codePath,
       })
+      dialog.close()
+      props.onRefresh?.()
       const sessionId = res.data?.session_id
       if (sessionId) {
-        dialog.close()
         navigateToExpSession(sessionId)
       }
     } catch (err) {
@@ -76,7 +88,7 @@ export function AtomSessionTab(props: {
     dialog.show(() => (
       <DialogCreateExperiment
         creating={creating()}
-        onSubmit={(baselineBranch, codePath) => doCreateExperiment(baselineBranch, codePath)}
+        onSubmit={(expName, baselineBranch, codePath) => doCreateExperiment(expName, baselineBranch, codePath)}
       />
     ))
   }
@@ -313,11 +325,10 @@ export function AtomSessionTab(props: {
                     <div class="flex items-center gap-1 group">
                       <button
                         class="flex-1 flex items-center gap-2 px-2 py-1.5 rounded text-left hover:bg-background-stronger transition-colors"
-                        onClick={() => exp.exp_session_id && navigateToExpSession(exp.exp_session_id)}
-                        disabled={!exp.exp_session_id}
+                        onClick={() => navigateToExpSession(exp.exp_id)}
                       >
                         <span class={`w-2 h-2 rounded-full shrink-0 ${statusColor(exp.status)}`} />
-                        <span class="text-12-regular text-text-base truncate">{exp.exp_id.slice(0, 8)}</span>
+                        <span class="text-12-regular text-text-base truncate">{exp.exp_name}</span>
                         <span class="text-11-regular text-text-weak ml-auto shrink-0">{exp.status}</span>
                       </button>
                       <button
@@ -442,14 +453,23 @@ export function AtomSessionTab(props: {
   )
 }
 
+type BranchOption = {
+  branch: string
+  displayName: string
+  experimentId: string | null
+}
+
 function DialogCreateExperiment(props: {
   creating: boolean
-  onSubmit: (baselineBranch: string, codePath: string) => void
+  onSubmit: (expName: string, baselineBranch: string, codePath: string) => void
 }) {
   const sdk = useSDK()
-  const [branch, setBranch] = createSignal("master")
+  const [expName, setExpName] = createSignal("")
+  const [selectedBranch, setSelectedBranch] = createSignal<BranchOption | null>(null)
   const [codePath, setCodePath] = createSignal("")
   const [codePaths, setCodePaths] = createSignal<Array<{ name: string; path: string }>>([])
+  const [branches, setBranches] = createSignal<BranchOption[]>([])
+  const [loadingBranches, setLoadingBranches] = createSignal(false)
 
   onMount(async () => {
     try {
@@ -460,10 +480,35 @@ function DialogCreateExperiment(props: {
     }
   })
 
+  // Fetch branches when codePath changes
+  createEffect(() => {
+    const cp = codePath()
+    if (!cp.trim()) {
+      setBranches([])
+      setSelectedBranch(null)
+      return
+    }
+    setLoadingBranches(true)
+    setSelectedBranch(null)
+    sdk.client.research
+      .branches({ codePath: cp })
+      .then((res) => {
+        if (res.data) {
+          setBranches(res.data)
+        }
+      })
+      .catch((err) => {
+        console.error("[DialogCreateExperiment] failed to load branches", err)
+        setBranches([])
+      })
+      .finally(() => setLoadingBranches(false))
+  })
+
   const handleSubmit = (e: SubmitEvent) => {
     e.preventDefault()
-    if (!codePath().trim()) return
-    props.onSubmit(branch(), codePath().trim())
+    const branch = selectedBranch()
+    if (!expName().trim() || !codePath().trim() || !branch) return
+    props.onSubmit(expName().trim(), branch.branch, codePath().trim())
   }
 
   const selectedOption = createMemo(() => codePaths().find((o) => o.path === codePath()) ?? null)
@@ -471,6 +516,12 @@ function DialogCreateExperiment(props: {
   return (
     <Dialog title="New Experiment">
       <form onSubmit={handleSubmit} class="flex flex-col gap-4 px-5 pb-5">
+        <TextField
+          label="Experiment Name"
+          placeholder="e.g. baseline-lr-sweep"
+          value={expName()}
+          onChange={(v) => setExpName(v)}
+        />
         <div class="flex flex-col gap-1.5">
           <label class="text-sm font-medium">Code Path</label>
           <Show when={codePaths().length > 0}>
@@ -486,8 +537,68 @@ function DialogCreateExperiment(props: {
           </Show>
           <TextField placeholder="/path/to/code" value={codePath()} onChange={(v) => setCodePath(v)} />
         </div>
-        <TextField label="Baseline Branch" placeholder="master" value={branch()} onChange={(v) => setBranch(v)} />
-        <Button type="submit" size="large" variant="primary" disabled={props.creating || !codePath().trim()}>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-sm font-medium">Baseline Branch</label>
+          <Show when={!loadingBranches()} fallback={<div class="text-xs text-text-weak py-1">Loading branches...</div>}>
+            <KobalteCombobox<BranchOption>
+              options={branches()}
+              value={selectedBranch()}
+              onChange={(val) => setSelectedBranch(val)}
+              optionValue="branch"
+              optionTextValue="displayName"
+              optionLabel="displayName"
+              placeholder="Search and select a branch..."
+              triggerMode="focus"
+              itemComponent={(itemProps) => (
+                <KobalteCombobox.Item item={itemProps.item} data-slot="select-select-item">
+                  <KobalteCombobox.ItemLabel data-slot="select-select-item-label">
+                    {itemProps.item.rawValue.displayName}
+                    <Show when={itemProps.item.rawValue.experimentId}>
+                      <span class="ml-1.5 text-text-weak text-xs">({itemProps.item.rawValue.branch.slice(0, 8)})</span>
+                    </Show>
+                  </KobalteCombobox.ItemLabel>
+                  <KobalteCombobox.ItemIndicator data-slot="select-select-item-indicator">
+                    <Icon name="check-small" size="small" />
+                  </KobalteCombobox.ItemIndicator>
+                </KobalteCombobox.Item>
+              )}
+            >
+              <KobalteCombobox.Control data-component="combobox-control" class="flex items-center">
+                <KobalteCombobox.Input
+                  data-component="combobox-input"
+                  class="flex-1 bg-transparent outline-none text-sm"
+                  style={{
+                    height: "32px",
+                    padding: "0 8px",
+                    "border-radius": "var(--radius-md)",
+                    "background-color": "var(--input-base)",
+                    "box-shadow": "var(--shadow-xs-border-base)",
+                    color: "var(--text-strong)",
+                  }}
+                />
+                <KobalteCombobox.Trigger data-component="combobox-trigger" class="absolute right-2">
+                  <KobalteCombobox.Icon>
+                    <Icon name="chevron-down" size="small" />
+                  </KobalteCombobox.Icon>
+                </KobalteCombobox.Trigger>
+              </KobalteCombobox.Control>
+              <KobalteCombobox.Portal>
+                <KobalteCombobox.Content data-component="select-content">
+                  <KobalteCombobox.Listbox data-slot="select-select-content-list" />
+                </KobalteCombobox.Content>
+              </KobalteCombobox.Portal>
+            </KobalteCombobox>
+          </Show>
+          <Show when={branches().length === 0 && codePath().trim() && !loadingBranches()}>
+            <div class="text-xs text-text-weak">No branches found for this code path</div>
+          </Show>
+        </div>
+        <Button
+          type="submit"
+          size="large"
+          variant="primary"
+          disabled={props.creating || !expName().trim() || !codePath().trim() || !selectedBranch()}
+        >
           {props.creating ? "Creating..." : "Create"}
         </Button>
       </form>

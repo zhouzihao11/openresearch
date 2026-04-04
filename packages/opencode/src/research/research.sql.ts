@@ -44,6 +44,7 @@ export const ExperimentTable = sqliteTable(
     research_project_id: text()
       .notNull()
       .references(() => ResearchProjectTable.research_project_id, { onDelete: "cascade" }),
+    exp_name: text().notNull(),
     exp_session_id: text().references(() => SessionTable.id, { onDelete: "set null" }),
     baseline_branch_name: text(),
     exp_branch_name: text(),
@@ -111,6 +112,7 @@ export const AtomRelationTable = sqliteTable(
 const watchStatuses = ["pending", "running", "finished", "failed", "crashed"] as const
 const executionStatuses = ["pending", "running", "finished", "failed", "canceled"] as const
 const executionStages = [
+  "pending",
   "planning",
   "coding",
   "deploying_code",
@@ -207,11 +209,27 @@ export const ArticleTable = sqliteTable(
       .notNull()
       .references(() => ResearchProjectTable.research_project_id, { onDelete: "cascade" }),
     path: text().notNull(),
-    code_path: text(),
     title: text(),
     source_url: text(),
     status: text().$type<"pending" | "parsed" | "failed">().notNull().default("pending"),
     ...Timestamps,
   },
   (table) => [index("article_research_project_idx").on(table.research_project_id)],
+)
+
+export const CodeTable = sqliteTable(
+  "code",
+  {
+    code_id: text().primaryKey(),
+    research_project_id: text()
+      .notNull()
+      .references(() => ResearchProjectTable.research_project_id, { onDelete: "cascade" }),
+    code_name: text().notNull(),
+    article_id: text().references(() => ArticleTable.article_id, { onDelete: "set null" }),
+    ...Timestamps,
+  },
+  (table) => [
+    index("code_research_project_idx").on(table.research_project_id),
+    index("code_article_idx").on(table.article_id),
+  ],
 )

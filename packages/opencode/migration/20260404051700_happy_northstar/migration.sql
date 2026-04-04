@@ -1,0 +1,1 @@
+ALTER TABLE `experiment` ADD `exp_name` text NOT NULL;

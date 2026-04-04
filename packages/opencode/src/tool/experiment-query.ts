@@ -71,6 +71,7 @@ function formatExpResult(r: ExpResult): string {
   const e = r.exp
   return [
     `exp_id: ${e.exp_id}`,
+    `exp_name: ${e.exp_name}`,
     `research_project_id: ${e.research_project_id}`,
     r.atom_id ? `atom_id: ${r.atom_id}` : `atom_id: (not linked)`,
     e.exp_session_id ? `exp_session_id: ${e.exp_session_id}` : null,

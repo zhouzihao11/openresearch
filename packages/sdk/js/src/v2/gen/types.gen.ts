@@ -4254,6 +4254,40 @@ export type ResearchProjectCreateResponses = {
 
 export type ResearchProjectCreateResponse = ResearchProjectCreateResponses[keyof ResearchProjectCreateResponses]
 
+export type ResearchArticleListData = {
+  body?: never
+  path: {
+    researchProjectId: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/research/project/{researchProjectId}/articles"
+}
+
+export type ResearchArticleListErrors = {
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type ResearchArticleListError = ResearchArticleListErrors[keyof ResearchArticleListErrors]
+
+export type ResearchArticleListResponses = {
+  /**
+   * List of articles
+   */
+  200: Array<{
+    article_id: string
+    filename: string
+    title: string | null
+  }>
+}
+
+export type ResearchArticleListResponse = ResearchArticleListResponses[keyof ResearchArticleListResponses]
+
 export type ResearchArticleCreateData = {
   body?: {
     sourcePath: string
@@ -4374,6 +4408,7 @@ export type ResearchSessionAtomGetResponses = {
       experiments: Array<{
         exp_id: string
         research_project_id: string
+        exp_name: string
         exp_session_id: string | null
         baseline_branch_name: string | null
         exp_branch_name: string | null
@@ -4435,9 +4470,194 @@ export type ResearchCodePathsResponses = {
 
 export type ResearchCodePathsResponse = ResearchCodePathsResponses[keyof ResearchCodePathsResponses]
 
+export type ResearchBranchesData = {
+  body?: never
+  path?: never
+  query: {
+    directory?: string
+    workspace?: string
+    codePath: string
+  }
+  url: "/research/branches"
+}
+
+export type ResearchBranchesErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ResearchBranchesError = ResearchBranchesErrors[keyof ResearchBranchesErrors]
+
+export type ResearchBranchesResponses = {
+  /**
+   * List of branches
+   */
+  200: Array<{
+    branch: string
+    displayName: string
+    experimentId: string | null
+  }>
+}
+
+export type ResearchBranchesResponse = ResearchBranchesResponses[keyof ResearchBranchesResponses]
+
+export type ResearchCodeListData = {
+  body?: never
+  path: {
+    researchProjectId: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/research/project/{researchProjectId}/codes"
+}
+
+export type ResearchCodeListErrors = {
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type ResearchCodeListError = ResearchCodeListErrors[keyof ResearchCodeListErrors]
+
+export type ResearchCodeListResponses = {
+  /**
+   * List of code records
+   */
+  200: Array<{
+    code_id: string
+    research_project_id: string
+    code_name: string
+    article_id: string | null
+    time_created: number
+    time_updated: number
+  }>
+}
+
+export type ResearchCodeListResponse = ResearchCodeListResponses[keyof ResearchCodeListResponses]
+
+export type ResearchCodeDeleteData = {
+  body?: never
+  path: {
+    codeId: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/research/code/{codeId}"
+}
+
+export type ResearchCodeDeleteErrors = {
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type ResearchCodeDeleteError = ResearchCodeDeleteErrors[keyof ResearchCodeDeleteErrors]
+
+export type ResearchCodeDeleteResponses = {
+  /**
+   * Deleted
+   */
+  200: {
+    success: boolean
+  }
+}
+
+export type ResearchCodeDeleteResponse = ResearchCodeDeleteResponses[keyof ResearchCodeDeleteResponses]
+
+export type ResearchCodeGetData = {
+  body?: never
+  path: {
+    codeId: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/research/code/{codeId}"
+}
+
+export type ResearchCodeGetErrors = {
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type ResearchCodeGetError = ResearchCodeGetErrors[keyof ResearchCodeGetErrors]
+
+export type ResearchCodeGetResponses = {
+  /**
+   * Code record
+   */
+  200: {
+    code_id: string
+    research_project_id: string
+    code_name: string
+    article_id: string | null
+    time_created: number
+    time_updated: number
+  }
+}
+
+export type ResearchCodeGetResponse = ResearchCodeGetResponses[keyof ResearchCodeGetResponses]
+
+export type ResearchCodeCreateData = {
+  body?: {
+    codeName: string
+    source: string
+    articleId?: string
+  }
+  path: {
+    researchProjectId: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/research/project/{researchProjectId}/code"
+}
+
+export type ResearchCodeCreateErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type ResearchCodeCreateError = ResearchCodeCreateErrors[keyof ResearchCodeCreateErrors]
+
+export type ResearchCodeCreateResponses = {
+  /**
+   * Created code record
+   */
+  200: {
+    code_id: string
+    research_project_id: string
+    code_name: string
+    article_id: string | null
+    time_created: number
+    time_updated: number
+  }
+}
+
+export type ResearchCodeCreateResponse = ResearchCodeCreateResponses[keyof ResearchCodeCreateResponses]
+
 export type ResearchExperimentCreateData = {
   body?: {
     atomId: string
+    expName: string
     baselineBranch?: string
     remoteServerId?: string
     codePath: string
@@ -4469,6 +4689,7 @@ export type ResearchExperimentCreateResponses = {
    */
   200: {
     exp_id: string
+    exp_name: string
     atom_id: string
     atom_name: string
     session_id: string
@@ -4481,6 +4702,41 @@ export type ResearchExperimentCreateResponses = {
 
 export type ResearchExperimentCreateResponse =
   ResearchExperimentCreateResponses[keyof ResearchExperimentCreateResponses]
+
+export type ResearchExperimentSessionCreateData = {
+  body?: never
+  path: {
+    expId: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/research/experiment/{expId}/session"
+}
+
+export type ResearchExperimentSessionCreateErrors = {
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type ResearchExperimentSessionCreateError =
+  ResearchExperimentSessionCreateErrors[keyof ResearchExperimentSessionCreateErrors]
+
+export type ResearchExperimentSessionCreateResponses = {
+  /**
+   * Session ID for the experiment
+   */
+  200: {
+    session_id: string
+    created: boolean
+  }
+}
+
+export type ResearchExperimentSessionCreateResponse =
+  ResearchExperimentSessionCreateResponses[keyof ResearchExperimentSessionCreateResponses]
 
 export type ResearchExperimentReadyData = {
   body?: never
@@ -4568,6 +4824,7 @@ export type ResearchExperimentBySessionResponses = {
   200: {
     exp_id: string
     research_project_id: string
+    exp_name: string
     exp_session_id: string | null
     baseline_branch_name: string | null
     exp_branch_name: string | null
@@ -4610,7 +4867,6 @@ export type ResearchExperimentBySessionResponses = {
       article_id: string
       research_project_id: string
       path: string
-      code_path: string | null
       title: string | null
       source_url: string | null
       status: "pending" | "parsed" | "failed"
@@ -4701,6 +4957,7 @@ export type ResearchProjectSessionTreeResponses = {
       session_id: string | null
       experiments: Array<{
         exp_id: string
+        exp_name: string
         exp_session_id: string | null
         status: "pending" | "running" | "done" | "idle" | "failed"
       }>
@@ -5005,6 +5262,7 @@ export type ResearchExperimentDeleteResponse =
 
 export type ResearchExperimentUpdateData = {
   body?: {
+    expName?: string
     baselineBranch?: string
     remoteServerId?: string | null
     codePath?: string
@@ -5035,6 +5293,7 @@ export type ResearchExperimentUpdateResponses = {
   200: {
     exp_id: string
     research_project_id: string
+    exp_name: string
     exp_session_id: string | null
     baseline_branch_name: string | null
     exp_branch_name: string | null

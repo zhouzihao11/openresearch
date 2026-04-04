@@ -87,8 +87,16 @@ export function WatchesTab(props: { onOpenFile?: (filePath: string) => void }) {
     fetchWatches()
   })
 
-  const goToSession = (sessionId: string) => {
-    navigate(`/${base64Encode(sdk.directory)}/session/${sessionId}`)
+  const goToSession = async (expId: string) => {
+    try {
+      const res = await sdk.client.research.experiment.session.create({ expId })
+      const sessionId = res.data?.session_id
+      if (sessionId) {
+        navigate(`/${base64Encode(sdk.directory)}/session/${sessionId}`)
+      }
+    } catch (err) {
+      console.error("[watches-tab] failed to get/create experiment session", err)
+    }
   }
 
   const openFile = (filePath: string) => {
@@ -157,7 +165,7 @@ export function WatchesTab(props: { onOpenFile?: (filePath: string) => void }) {
                 {(watch) => (
                   <div
                     class="rounded-md border border-border-weak-base bg-background-base px-3 py-2 text-12-regular text-text-base flex flex-col gap-1 cursor-pointer hover:border-border-base transition-colors"
-                    onClick={() => watch.exp_session_id && goToSession(watch.exp_session_id)}
+                    onClick={() => goToSession(watch.exp_id)}
                   >
                     <div class="flex items-center justify-between">
                       <div class="font-mono text-11-regular truncate" title={watch.title}>

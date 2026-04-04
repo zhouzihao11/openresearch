@@ -109,6 +109,8 @@ import type {
   QuestionReplyResponses,
   ResearchArticleCreateErrors,
   ResearchArticleCreateResponses,
+  ResearchArticleListErrors,
+  ResearchArticleListResponses,
   ResearchAtomCreateErrors,
   ResearchAtomCreateResponses,
   ResearchAtomDeleteErrors,
@@ -119,6 +121,16 @@ import type {
   ResearchAtomsListResponses,
   ResearchAtomUpdateErrors,
   ResearchAtomUpdateResponses,
+  ResearchBranchesErrors,
+  ResearchBranchesResponses,
+  ResearchCodeCreateErrors,
+  ResearchCodeCreateResponses,
+  ResearchCodeDeleteErrors,
+  ResearchCodeDeleteResponses,
+  ResearchCodeGetErrors,
+  ResearchCodeGetResponses,
+  ResearchCodeListErrors,
+  ResearchCodeListResponses,
   ResearchCodePathsErrors,
   ResearchCodePathsResponses,
   ResearchExperimentBySessionErrors,
@@ -133,6 +145,8 @@ import type {
   ResearchExperimentReadyResponses,
   ResearchExperimentRunsErrors,
   ResearchExperimentRunsResponses,
+  ResearchExperimentSessionCreateErrors,
+  ResearchExperimentSessionCreateResponses,
   ResearchExperimentUpdateErrors,
   ResearchExperimentUpdateResponses,
   ResearchExperimentWatchDeleteErrors,
@@ -2932,6 +2946,38 @@ export class Relation extends HeyApiClient {
 
 export class Article extends HeyApiClient {
   /**
+   * List articles for a research project
+   *
+   * Return article IDs and file names for a research project, useful for dropdown selectors.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters: {
+      researchProjectId: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "researchProjectId" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ResearchArticleListResponses, ResearchArticleListErrors, ThrowOnError>({
+      url: "/research/project/{researchProjectId}/articles",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
    * Add article to research project
    *
    * Add a single article (paper/PDF) to an existing research project.
@@ -3024,6 +3070,187 @@ export class Session4 extends HeyApiClient {
   }
 }
 
+export class Code extends HeyApiClient {
+  /**
+   * List codes for a research project
+   *
+   * Query all code records belonging to a research project.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters: {
+      researchProjectId: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "researchProjectId" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ResearchCodeListResponses, ResearchCodeListErrors, ThrowOnError>({
+      url: "/research/project/{researchProjectId}/codes",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Delete a code record
+   *
+   * Delete a code record and its directory on disk.
+   */
+  public delete<ThrowOnError extends boolean = false>(
+    parameters: {
+      codeId: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "codeId" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<ResearchCodeDeleteResponses, ResearchCodeDeleteErrors, ThrowOnError>(
+      {
+        url: "/research/code/{codeId}",
+        ...options,
+        ...params,
+      },
+    )
+  }
+
+  /**
+   * Get a code record
+   *
+   * Get a single code record by its ID.
+   */
+  public get<ThrowOnError extends boolean = false>(
+    parameters: {
+      codeId: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "codeId" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ResearchCodeGetResponses, ResearchCodeGetErrors, ThrowOnError>({
+      url: "/research/code/{codeId}",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Create a code record
+   *
+   * Clone a GitHub repository or copy a local directory into the project's code/ directory, and create a code record.
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters: {
+      researchProjectId: string
+      directory?: string
+      workspace?: string
+      codeName?: string
+      source?: string
+      articleId?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "researchProjectId" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "codeName" },
+            { in: "body", key: "source" },
+            { in: "body", key: "articleId" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<ResearchCodeCreateResponses, ResearchCodeCreateErrors, ThrowOnError>({
+      url: "/research/project/{researchProjectId}/code",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Session5 extends HeyApiClient {
+  /**
+   * Create or get session for an experiment
+   *
+   * If the experiment already has a session that is not archived, returns its session ID. Otherwise creates a new session and binds it to the experiment.
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters: {
+      expId: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "expId" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ResearchExperimentSessionCreateResponses,
+      ResearchExperimentSessionCreateErrors,
+      ThrowOnError
+    >({
+      url: "/research/experiment/{expId}/session",
+      ...options,
+      ...params,
+    })
+  }
+}
+
 export class Experiment extends HeyApiClient {
   /**
    * Create experiment for an atom
@@ -3035,6 +3262,7 @@ export class Experiment extends HeyApiClient {
       directory?: string
       workspace?: string
       atomId?: string
+      expName?: string
       baselineBranch?: string
       remoteServerId?: string
       codePath?: string
@@ -3049,6 +3277,7 @@ export class Experiment extends HeyApiClient {
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
             { in: "body", key: "atomId" },
+            { in: "body", key: "expName" },
             { in: "body", key: "baselineBranch" },
             { in: "body", key: "remoteServerId" },
             { in: "body", key: "codePath" },
@@ -3256,6 +3485,7 @@ export class Experiment extends HeyApiClient {
       expId: string
       directory?: string
       workspace?: string
+      expName?: string
       baselineBranch?: string
       remoteServerId?: string | null
       codePath?: string
@@ -3270,6 +3500,7 @@ export class Experiment extends HeyApiClient {
             { in: "path", key: "expId" },
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
+            { in: "body", key: "expName" },
             { in: "body", key: "baselineBranch" },
             { in: "body", key: "remoteServerId" },
             { in: "body", key: "codePath" },
@@ -3291,6 +3522,11 @@ export class Experiment extends HeyApiClient {
         ...params.headers,
       },
     })
+  }
+
+  private _session?: Session5
+  get session(): Session5 {
+    return (this._session ??= new Session5({ client: this.client }))
   }
 }
 
@@ -3560,6 +3796,38 @@ export class Research extends HeyApiClient {
     })
   }
 
+  /**
+   * List git branches for a code path
+   *
+   * List local git branches under the given code path. If a branch is associated with an experiment, returns the experiment name as displayName.
+   */
+  public branches<ThrowOnError extends boolean = false>(
+    parameters: {
+      directory?: string
+      workspace?: string
+      codePath: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "codePath" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ResearchBranchesResponses, ResearchBranchesErrors, ThrowOnError>({
+      url: "/research/branches",
+      ...options,
+      ...params,
+    })
+  }
+
   private _project?: Project2
   get project(): Project2 {
     return (this._project ??= new Project2({ client: this.client }))
@@ -3588,6 +3856,11 @@ export class Research extends HeyApiClient {
   private _session?: Session4
   get session(): Session4 {
     return (this._session ??= new Session4({ client: this.client }))
+  }
+
+  private _code?: Code
+  get code(): Code {
+    return (this._code ??= new Code({ client: this.client }))
   }
 
   private _experiment?: Experiment

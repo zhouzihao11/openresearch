@@ -34,6 +34,7 @@ import { AtomSessionTab } from "@/pages/session/atom-session-tab"
 import { ExpPlanTab, ExpHistoryChangeTab, ExpResultTab, ExpProgressTab } from "@/pages/session/experiment-tab"
 import { ServersTab } from "@/pages/session/servers-tab"
 import { WatchesTab } from "@/pages/session/watches-tab"
+import { CodesTab } from "@/pages/session/codes-tab"
 import { setSessionHandoff } from "@/pages/session/handoff"
 
 export function SessionSidePanel(props: {
@@ -288,6 +289,7 @@ export function SessionSidePanel(props: {
           tab !== "atom-assessment" &&
           tab !== "servers" &&
           tab !== "watches" &&
+          tab !== "codes" &&
           tab !== "exp-info" &&
           tab !== "exp-plan" &&
           tab !== "exp-history" &&
@@ -303,6 +305,7 @@ export function SessionSidePanel(props: {
     if (active === "atoms" && isResearchProject() && !isAtomSession() && !isExpSession()) return "atoms"
     if (active === "servers" && isResearchProject() && !isAtomSession() && !isExpSession()) return "servers"
     if (active === "watches" && isResearchProject() && !isAtomSession() && !isExpSession()) return "watches"
+    if (active === "codes" && isResearchProject() && !isAtomSession() && !isExpSession()) return "codes"
     if (active === "atom-content" && isAtomSession()) return "atom-content"
     if (active === "atom-evidence" && isAtomSession()) return "atom-evidence"
     if (active === "atom-plan" && isAtomSession()) return "atom-plan"
@@ -490,6 +493,11 @@ export function SessionSidePanel(props: {
                             <div>Watches</div>
                           </div>
                         </Tabs.Trigger>
+                        <Tabs.Trigger value="codes">
+                          <div class="flex items-center gap-1.5">
+                            <div>Codes</div>
+                          </div>
+                        </Tabs.Trigger>
                       </Show>
                       <Show when={!isExpSession() && isAtomSession()}>
                         <Tabs.Trigger value="atom-content">
@@ -607,6 +615,11 @@ export function SessionSidePanel(props: {
                         <Tabs.Content value="watches" class="flex flex-col h-full overflow-hidden contain-strict">
                           <Show when={activeTab() === "watches"}>
                             <WatchesTab onOpenFile={(filePath) => openTab(file.tab(filePath))} />
+                          </Show>
+                        </Tabs.Content>
+                        <Tabs.Content value="codes" class="flex flex-col h-full overflow-hidden contain-strict">
+                          <Show when={activeTab() === "codes"}>
+                            <CodesTab researchProjectId={project.research_project_id} />
                           </Show>
                         </Tabs.Content>
                       </>

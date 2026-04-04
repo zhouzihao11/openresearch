@@ -10,6 +10,7 @@ import { ProjectTable } from "@/project/project.sql"
 import {
   ResearchProjectTable,
   ArticleTable,
+  CodeTable,
   AtomTable,
   AtomRelationTable,
   ExperimentTable,
@@ -84,6 +85,7 @@ const remoteServerConfigSchema = z.object({
 const experimentSchema = z.object({
   exp_id: z.string(),
   research_project_id: z.string(),
+  exp_name: z.string(),
   exp_session_id: z.string().nullable(),
   baseline_branch_name: z.string().nullable(),
   exp_branch_name: z.string().nullable(),
@@ -140,13 +142,24 @@ const articleSchema = z.object({
   article_id: z.string(),
   research_project_id: z.string(),
   path: z.string(),
-  code_path: z.string().nullable(),
   title: z.string().nullable(),
   source_url: z.string().nullable(),
   status: z.enum(["pending", "parsed", "failed"]),
   time_created: z.number(),
   time_updated: z.number(),
 })
+
+const codeSchema = z.object({
+  code_id: z.string(),
+  research_project_id: z.string(),
+  code_name: z.string(),
+  article_id: z.string().nullable(),
+  time_created: z.number(),
+  time_updated: z.number(),
+})
+
+const VALID_CODE_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/
+const GITHUB_URL_RE = /^https?:\/\/(www\.)?github\.com\/.+\/.+/
 
 type RemoteServerConfig = z.infer<typeof remoteServerConfigSchema>
 
@@ -1000,7 +1013,6 @@ export const ResearchRoutes = new Hono()
           article_id: uniqueID(),
           research_project_id: researchProjectID,
           path: file.dest,
-          code_path: null,
           time_created: now,
           time_updated: now,
         }))
@@ -1017,6 +1029,56 @@ export const ResearchRoutes = new Hono()
       })
 
       return c.json(result)
+    },
+  )
+  .get(
+    "/project/:researchProjectId/articles",
+    describeRoute({
+      summary: "List articles for a research project",
+      description: "Return article IDs and file names for a research project, useful for dropdown selectors.",
+      operationId: "research.article.list",
+      responses: {
+        200: {
+          description: "List of articles",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.array(
+                  z.object({
+                    article_id: z.string(),
+                    filename: z.string(),
+                    title: z.string().nullable(),
+                  }),
+                ),
+              ),
+            },
+          },
+        },
+        ...errors(404),
+      },
+    }),
+    async (c) => {
+      const researchProjectId = c.req.param("researchProjectId")
+      const project = Database.use((db) =>
+        db
+          .select()
+          .from(ResearchProjectTable)
+          .where(eq(ResearchProjectTable.research_project_id, researchProjectId))
+          .get(),
+      )
+      if (!project) {
+        return c.json({ success: false, message: "research project not found" }, 404)
+      }
+      const articles = Database.use((db) =>
+        db.select().from(ArticleTable).where(eq(ArticleTable.research_project_id, researchProjectId)).all(),
+      )
+      return c.json(
+        articles.map((a) => ({
+          article_id: a.article_id,
+          filename: a.path.split("/").pop() ?? a.path,
+          title: a.title,
+        })),
+      )
     },
   )
   .post(
@@ -1101,7 +1163,6 @@ export const ResearchRoutes = new Hono()
             article_id: articleId,
             research_project_id: researchProjectId,
             path: destPath,
-            code_path: null,
             title: body.title ?? null,
             source_url: body.sourceUrl ?? null,
             status: "pending",
@@ -1255,6 +1316,291 @@ export const ResearchRoutes = new Hono()
       return c.json(codePaths)
     },
   )
+  .get(
+    "/branches",
+    describeRoute({
+      summary: "List git branches for a code path",
+      description:
+        "List local git branches under the given code path. If a branch is associated with an experiment, returns the experiment name as displayName.",
+      operationId: "research.branches",
+      responses: {
+        200: {
+          description: "List of branches",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.array(
+                  z.object({
+                    branch: z.string(),
+                    displayName: z.string(),
+                    experimentId: z.string().nullable(),
+                  }),
+                ),
+              ),
+            },
+          },
+        },
+        ...errors(400),
+      },
+    }),
+    validator(
+      "query",
+      z.object({
+        codePath: z.string().min(1, "codePath required"),
+      }),
+    ),
+    async (c) => {
+      const { codePath } = c.req.valid("query")
+
+      if (!fs.existsSync(codePath)) {
+        return c.json({ success: false, message: `codePath not found: ${codePath}` }, 400)
+      }
+
+      const result = await git(["branch", "--format=%(refname:short)"], { cwd: codePath })
+      if (result.exitCode !== 0) {
+        return c.json({ success: false, message: `git error: ${result.stderr.toString()}` }, 400)
+      }
+
+      const raw = result.text().trim()
+      if (!raw) {
+        return c.json([])
+      }
+
+      const branches: string[] = []
+      for (const line of raw.split("\n")) {
+        const name = line.trim()
+        if (!name) continue
+        branches.push(name)
+      }
+
+      // find experiments linked to these branches
+      const experiments = Database.use((db) => db.select().from(ExperimentTable).all())
+      const expByBranch = new Map<string, { expId: string; expName: string }>()
+      for (const exp of experiments) {
+        if (exp.exp_branch_name) {
+          expByBranch.set(exp.exp_branch_name, { expId: exp.exp_id, expName: exp.exp_name })
+        }
+      }
+
+      const items = branches.map((branch) => {
+        const exp = expByBranch.get(branch)
+        return {
+          branch,
+          displayName: exp ? exp.expName : branch,
+          experimentId: exp ? exp.expId : null,
+        }
+      })
+
+      return c.json(items)
+    },
+  )
+  // ── Code CRUD ──
+  .get(
+    "/project/:researchProjectId/codes",
+    describeRoute({
+      summary: "List codes for a research project",
+      description: "Query all code records belonging to a research project.",
+      operationId: "research.code.list",
+      responses: {
+        200: {
+          description: "List of code records",
+          content: {
+            "application/json": {
+              schema: resolver(z.array(codeSchema)),
+            },
+          },
+        },
+        ...errors(404),
+      },
+    }),
+    async (c) => {
+      const researchProjectId = c.req.param("researchProjectId")
+      const project = Database.use((db) =>
+        db
+          .select()
+          .from(ResearchProjectTable)
+          .where(eq(ResearchProjectTable.research_project_id, researchProjectId))
+          .get(),
+      )
+      if (!project) {
+        return c.json({ success: false, message: "research project not found" }, 404)
+      }
+      const codes = Database.use((db) =>
+        db.select().from(CodeTable).where(eq(CodeTable.research_project_id, researchProjectId)).all(),
+      )
+      return c.json(codes)
+    },
+  )
+  .get(
+    "/code/:codeId",
+    describeRoute({
+      summary: "Get a code record",
+      description: "Get a single code record by its ID.",
+      operationId: "research.code.get",
+      responses: {
+        200: {
+          description: "Code record",
+          content: {
+            "application/json": {
+              schema: resolver(codeSchema),
+            },
+          },
+        },
+        ...errors(404),
+      },
+    }),
+    async (c) => {
+      const codeId = c.req.param("codeId")
+      const code = Database.use((db) => db.select().from(CodeTable).where(eq(CodeTable.code_id, codeId)).get())
+      if (!code) {
+        return c.json({ success: false, message: `code not found: ${codeId}` }, 404)
+      }
+      return c.json(code)
+    },
+  )
+  .delete(
+    "/code/:codeId",
+    describeRoute({
+      summary: "Delete a code record",
+      description: "Delete a code record and its directory on disk.",
+      operationId: "research.code.delete",
+      responses: {
+        200: {
+          description: "Deleted",
+          content: {
+            "application/json": {
+              schema: resolver(z.object({ success: z.boolean() })),
+            },
+          },
+        },
+        ...errors(404),
+      },
+    }),
+    async (c) => {
+      const codeId = c.req.param("codeId")
+      const code = Database.use((db) => db.select().from(CodeTable).where(eq(CodeTable.code_id, codeId)).get())
+      if (!code) {
+        return c.json({ success: false, message: `code not found: ${codeId}` }, 404)
+      }
+      const codeDir = path.join(Instance.directory, "code", code.code_name)
+      await rm(codeDir, { recursive: true, force: true }).catch(() => {})
+      Database.use((db) => db.delete(CodeTable).where(eq(CodeTable.code_id, codeId)).run())
+      return c.json({ success: true })
+    },
+  )
+  .post(
+    "/project/:researchProjectId/code",
+    describeRoute({
+      summary: "Create a code record",
+      description:
+        "Clone a GitHub repository or copy a local directory into the project's code/ directory, and create a code record.",
+      operationId: "research.code.create",
+      responses: {
+        200: {
+          description: "Created code record",
+          content: {
+            "application/json": {
+              schema: resolver(codeSchema),
+            },
+          },
+        },
+        ...errors(400, 404),
+      },
+    }),
+    validator(
+      "json",
+      z.object({
+        codeName: z.string().min(1, "codeName required"),
+        source: z.string().min(1, "source required"),
+        articleId: z.string().optional(),
+      }),
+    ),
+    async (c) => {
+      const researchProjectId = c.req.param("researchProjectId")
+      const body = c.req.valid("json")
+
+      // Validate research project
+      const project = Database.use((db) =>
+        db
+          .select()
+          .from(ResearchProjectTable)
+          .where(eq(ResearchProjectTable.research_project_id, researchProjectId))
+          .get(),
+      )
+      if (!project) {
+        return c.json({ success: false, message: "research project not found" }, 404)
+      }
+
+      // Validate code_name
+      if (!VALID_CODE_NAME_RE.test(body.codeName) || body.codeName === "." || body.codeName === "..") {
+        return c.json(
+          {
+            success: false,
+            message:
+              "invalid codeName: must start with alphanumeric and contain only letters, digits, dots, hyphens, underscores",
+          },
+          400,
+        )
+      }
+
+      // Validate articleId if provided
+      if (body.articleId) {
+        const article = Database.use((db) =>
+          db.select().from(ArticleTable).where(eq(ArticleTable.article_id, body.articleId!)).get(),
+        )
+        if (!article) {
+          return c.json({ success: false, message: `article not found: ${body.articleId}` }, 404)
+        }
+      }
+
+      const codeDest = path.join(Instance.directory, "code", body.codeName)
+      if (await Filesystem.exists(codeDest)) {
+        return c.json({ success: false, message: `code directory already exists: ${body.codeName}` }, 400)
+      }
+
+      const isGithub = GITHUB_URL_RE.test(body.source)
+
+      if (isGithub) {
+        const result = await git(["clone", "--depth", "1", body.source, codeDest], {
+          cwd: Instance.directory,
+        })
+        if (result.exitCode !== 0) {
+          const errMsg = result.stderr?.toString().trim() || result.text?.().trim() || "git clone failed"
+          return c.json({ success: false, message: `failed to clone repository: ${errMsg}` }, 400)
+        }
+      } else {
+        const srcDir = path.resolve(body.source)
+        if (!(await Filesystem.exists(srcDir))) {
+          return c.json({ success: false, message: `local directory not found: ${srcDir}` }, 400)
+        }
+        const stat = fs.statSync(srcDir)
+        if (!stat.isDirectory()) {
+          return c.json({ success: false, message: `source is not a directory: ${srcDir}` }, 400)
+        }
+        await fs.promises.mkdir(path.dirname(codeDest), { recursive: true })
+        await fs.promises.cp(srcDir, codeDest, { recursive: true })
+      }
+
+      const now = Date.now()
+      const codeId = uniqueID()
+      Database.use((db) =>
+        db
+          .insert(CodeTable)
+          .values({
+            code_id: codeId,
+            research_project_id: researchProjectId,
+            code_name: body.codeName,
+            article_id: body.articleId ?? null,
+            time_created: now,
+            time_updated: now,
+          })
+          .run(),
+      )
+
+      const created = Database.use((db) => db.select().from(CodeTable).where(eq(CodeTable.code_id, codeId)).get())!
+      return c.json(created)
+    },
+  )
   .post(
     "/experiment",
     describeRoute({
@@ -1270,6 +1616,7 @@ export const ResearchRoutes = new Hono()
               schema: resolver(
                 z.object({
                   exp_id: z.string(),
+                  exp_name: z.string(),
                   atom_id: z.string(),
                   atom_name: z.string(),
                   session_id: z.string(),
@@ -1289,6 +1636,7 @@ export const ResearchRoutes = new Hono()
       "json",
       z.object({
         atomId: z.string().min(1, "atomId required"),
+        expName: z.string().min(1, "expName required"),
         baselineBranch: z.string().optional().default("master"),
         remoteServerId: z.string().optional(),
         codePath: z.string().min(1, "codePath required"),
@@ -1302,7 +1650,7 @@ export const ResearchRoutes = new Hono()
         return c.json({ success: false, message: `atom not found: ${body.atomId}` }, 404)
       }
       const expId = uniqueID()
-      const session = await Session.create({ title: `Exp: ${atom.atom_name}` })
+      const session = await Session.create({ title: `Exp: ${body.expName}` })
 
       const expDir = path.join(Instance.directory, "exp_results", expId)
       const expResultPath = path.join(expDir, "result.wandb")
@@ -1312,6 +1660,25 @@ export const ResearchRoutes = new Hono()
       await Filesystem.write(path.join(expDir, ".keep"), "")
       await Filesystem.write(expPlanPath, "")
 
+      // Create experiment branch from baseline without switching (won't affect running experiments)
+      const baselineExists = await git(["rev-parse", "--verify", body.baselineBranch], { cwd: body.codePath })
+      if (baselineExists.exitCode !== 0) {
+        return c.json(
+          { success: false, message: `baseline branch "${body.baselineBranch}" not found at ${body.codePath}` },
+          400,
+        )
+      }
+      const createBranch = await git(["branch", expId, body.baselineBranch], { cwd: body.codePath })
+      if (createBranch.exitCode !== 0) {
+        return c.json(
+          {
+            success: false,
+            message: `failed to create branch ${expId} from ${body.baselineBranch}: ${createBranch.stderr?.toString().trim() || "unknown error"}`,
+          },
+          400,
+        )
+      }
+
       const now = Date.now()
       Database.use((db) =>
         db
@@ -1319,6 +1686,7 @@ export const ResearchRoutes = new Hono()
           .values({
             exp_id: expId,
             research_project_id: atom.research_project_id,
+            exp_name: body.expName,
             atom_id: body.atomId,
             exp_session_id: session.id,
             baseline_branch_name: body.baselineBranch,
@@ -1335,8 +1703,11 @@ export const ResearchRoutes = new Hono()
           .run(),
       )
 
+      ExperimentExecutionWatch.createOrGet(expId, `${body.expName} for ${atom.atom_name}`, "pending")
+
       return c.json({
         exp_id: expId,
+        exp_name: body.expName,
         atom_id: body.atomId,
         atom_name: atom.atom_name,
         session_id: session.id,
@@ -1346,6 +1717,60 @@ export const ResearchRoutes = new Hono()
         exp_result_summary_path: expResultSummaryPath,
         remote_server_config: resolveRemoteServerConfig(body.remoteServerId ?? null),
       })
+    },
+  )
+  .post(
+    "/experiment/:expId/session",
+    describeRoute({
+      summary: "Create or get session for an experiment",
+      description:
+        "If the experiment already has a session that is not archived, returns its session ID. Otherwise creates a new session and binds it to the experiment.",
+      operationId: "research.experiment.session.create",
+      responses: {
+        200: {
+          description: "Session ID for the experiment",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.object({
+                  session_id: z.string(),
+                  created: z.boolean(),
+                }),
+              ),
+            },
+          },
+        },
+        ...errors(404),
+      },
+    }),
+    async (c) => {
+      const expId = c.req.param("expId")
+
+      const experiment = Database.use((db) =>
+        db.select().from(ExperimentTable).where(eq(ExperimentTable.exp_id, expId)).get(),
+      )
+      if (!experiment) {
+        return c.json({ success: false, message: `experiment not found: ${expId}` }, 404)
+      }
+
+      if (experiment.exp_session_id) {
+        const existing = await Session.get(experiment.exp_session_id).catch(() => undefined)
+        if (existing && !existing.time.archived) {
+          return c.json({ session_id: experiment.exp_session_id, created: false })
+        }
+      }
+
+      const session = await Session.create({ title: `Exp: ${experiment.exp_name}` })
+
+      Database.use((db) =>
+        db
+          .update(ExperimentTable)
+          .set({ exp_session_id: session.id, time_updated: Date.now() })
+          .where(eq(ExperimentTable.exp_id, expId))
+          .run(),
+      )
+
+      return c.json({ session_id: session.id, created: true })
     },
   )
   .post(
@@ -1581,6 +2006,7 @@ export const ResearchRoutes = new Hono()
                       experiments: z.array(
                         z.object({
                           exp_id: z.string(),
+                          exp_name: z.string(),
                           exp_session_id: z.string().nullable(),
                           status: z.enum(["pending", "running", "done", "idle", "failed"]),
                         }),
@@ -1643,6 +2069,7 @@ export const ResearchRoutes = new Hono()
         session_id: atom.session_id,
         experiments: (expsByAtom.get(atom.atom_id) ?? []).map((exp) => ({
           exp_id: exp.exp_id,
+          exp_name: exp.exp_name,
           exp_session_id: exp.exp_session_id,
           status: exp.status,
           remote_server_config: resolveRemoteServerConfig(exp.remote_server_id),
@@ -2067,6 +2494,7 @@ export const ResearchRoutes = new Hono()
     validator(
       "json",
       z.object({
+        expName: z.string().optional(),
         baselineBranch: z.string().optional(),
         remoteServerId: z.string().nullable().optional(),
         codePath: z.string().optional(),
@@ -2084,6 +2512,7 @@ export const ResearchRoutes = new Hono()
       }
 
       const updates: Record<string, unknown> = { time_updated: Date.now() }
+      if (body.expName !== undefined) updates.exp_name = body.expName
       if (body.baselineBranch !== undefined) updates.baseline_branch_name = body.baselineBranch
       if (body.remoteServerId !== undefined) updates.remote_server_id = body.remoteServerId
       if (body.codePath !== undefined) updates.code_path = body.codePath
