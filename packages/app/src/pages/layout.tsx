@@ -932,6 +932,26 @@ export default function Layout(props: ParentProps) {
     }
   }
 
+  async function unarchiveSession(session: Session) {
+    await globalSDK.client.session.update({
+      directory: session.directory,
+      sessionID: session.id,
+      time: { archived: undefined },
+    })
+    const [store, setStore] = globalSync.child(session.directory)
+    setStore(
+      produce((draft) => {
+        const updated = { ...session, time: { ...session.time, archived: undefined } }
+        const match = Binary.search(draft.session, session.id, (s) => s.id)
+        if (match.found) {
+          draft.session[match.index] = updated
+        } else {
+          draft.session.splice(match.index, 0, updated)
+        }
+      }),
+    )
+  }
+
   command.register("layout", () => {
     const commands: CommandOption[] = [
       {
@@ -1004,6 +1024,18 @@ export default function Layout(props: ParentProps) {
         onSelect: () => {
           const session = currentSessions().find((s) => s.id === params.id)
           if (session) archiveSession(session)
+        },
+      },
+      {
+        id: "session.viewArchived",
+        title: language.t("command.session.viewArchived"),
+        category: language.t("command.category.session"),
+        disabled: !params.dir,
+        onSelect: () => {
+          const project = currentProject()
+          if (project) {
+            dialog.show(() => <DialogArchivedSessions directory={project.worktree} />)
+          }
         },
       },
       {
@@ -1842,6 +1874,95 @@ export default function Layout(props: ParentProps) {
             </Button>
             <Button variant="primary" size="large" disabled={state.status === "loading"} onClick={handleReset}>
               {language.t("workspace.reset.button")}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+    )
+  }
+
+  function DialogArchivedSessions(props: { directory: string }) {
+    const [state, setState] = createStore({
+      loading: true,
+      sessions: [] as Session[],
+    })
+
+    onMount(async () => {
+      const sessions = await globalSDK.client.experimental.session
+        .list({ directory: props.directory, limit: 1000, archived: true })
+        .then((x) => x.data ?? [])
+        .catch(() => [])
+      setState({ loading: false, sessions })
+    })
+
+    const handleUnarchive = async (session: Session) => {
+      await unarchiveSession(session)
+      setState(
+        produce((draft) => {
+          const index = draft.sessions.findIndex((s) => s.id === session.id)
+          if (index !== -1) draft.sessions.splice(index, 1)
+        }),
+      )
+    }
+
+    const handleDelete = async (session: Session) => {
+      await globalSDK.client.session.delete({ sessionID: session.id })
+      setState(
+        produce((draft) => {
+          const index = draft.sessions.findIndex((s) => s.id === session.id)
+          if (index !== -1) draft.sessions.splice(index, 1)
+        }),
+      )
+    }
+
+    return (
+      <Dialog title={language.t("dialog.archived.title")} fit>
+        <div class="flex flex-col gap-3 pl-6 pr-2.5 pb-3 min-w-[500px] max-h-[600px]">
+          <Show when={!state.loading} fallback={<div class="text-13-regular text-text-weak py-4">Loading...</div>}>
+            <Show
+              when={state.sessions.length > 0}
+              fallback={<div class="text-13-regular text-text-weak py-4">{language.t("dialog.archived.empty")}</div>}
+            >
+              <div class="text-12-regular text-text-weak pb-2">
+                {language.t("dialog.archived.count", { count: state.sessions.length })}
+              </div>
+              <div class="flex flex-col gap-2 overflow-y-auto max-h-[500px]">
+                <For each={state.sessions}>
+                  {(session) => (
+                    <div class="flex items-center justify-between gap-3 p-3 rounded-lg bg-bg-weak hover:bg-bg-weaker">
+                      <div class="flex flex-col gap-1 flex-1 min-w-0">
+                        <span class="text-13-medium text-text-strong truncate">{session.title || "Untitled"}</span>
+                        <span class="text-11-regular text-text-weak">
+                          {new Date(session.time.archived!).toLocaleString()}
+                        </span>
+                      </div>
+                      <div class="flex gap-2">
+                        <Tooltip value={language.t("common.unarchive")} placement="top">
+                          <IconButton
+                            icon="archive"
+                            size="small"
+                            variant="ghost"
+                            onClick={() => void handleUnarchive(session)}
+                          />
+                        </Tooltip>
+                        <Tooltip value={language.t("common.delete")} placement="top">
+                          <IconButton
+                            icon="trash"
+                            size="small"
+                            variant="ghost"
+                            onClick={() => void handleDelete(session)}
+                          />
+                        </Tooltip>
+                      </div>
+                    </div>
+                  )}
+                </For>
+              </div>
+            </Show>
+          </Show>
+          <div class="flex justify-end gap-2 pt-2">
+            <Button variant="ghost" size="large" onClick={() => dialog.close()}>
+              {language.t("common.close")}
             </Button>
           </div>
         </div>

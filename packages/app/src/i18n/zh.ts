@@ -40,6 +40,7 @@ export const dict = {
   "command.session.previous.unseen": "上一个未读会话",
   "command.session.next.unseen": "下一个未读会话",
   "command.session.archive": "归档会话",
+  "command.session.viewArchived": "查看归档会话",
 
   "command.palette": "命令面板",
 
@@ -363,6 +364,9 @@ export const dict = {
   "dialog.project.delete.description": "这会永久删除该项目的会话和相关本地元数据。",
   "dialog.project.delete.removeLocal": "同时删除项目文件夹",
   "dialog.project.delete.removeLocal.description": "警告：这将永久删除磁盘上的所有项目文件",
+  "dialog.archived.title": "归档会话",
+  "dialog.archived.empty": "没有归档的会话",
+  "dialog.archived.count": "共 {{count}} 个归档会话",
 
   "context.breakdown.title": "上下文拆分",
   "context.breakdown.note": "输入 token 的大致拆分。“其他”包含工具定义和开销。",
@@ -587,6 +591,7 @@ export const dict = {
   "common.rename": "重命名",
   "common.reset": "重置",
   "common.archive": "归档",
+  "common.unarchive": "取消归档",
   "common.delete": "删除",
   "common.close": "关闭",
   "common.edit": "编辑",
