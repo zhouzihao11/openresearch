@@ -125,6 +125,36 @@ for (const item of targets) {
   await Bun.build({
     conditions: ["browser"],
     tsconfig: "./tsconfig.json",
+    plugins: [
+      {
+        name: "force-node-pdf-parse",
+        setup(build) {
+          // pdf-parse's "browser" export resolves to a web bundle that inlines pdfjs-dist
+          // with web worker dependencies that don't exist in compiled Bun binaries.
+          // Force it to use the Node ESM entry which uses pdfjs-dist/legacy instead.
+          const pdfParseReal = fs.realpathSync(path.dirname(require.resolve("pdf-parse/package.json")))
+          const pdfjsReal = fs.realpathSync(path.resolve(pdfParseReal, "../pdfjs-dist"))
+          const pdfjsLegacy = path.resolve(pdfjsReal, "legacy/build")
+
+          build.onResolve({ filter: /^pdf-parse$/ }, () => {
+            return { path: path.resolve(pdfParseReal, "dist/pdf-parse/esm/index.js") }
+          })
+
+          // pdfjs does `import(this.workerSrc)` which is a runtime dynamic import
+          // that can't be resolved by the bundler. Patch it to a static import so
+          // Bun can bundle the worker file into the compiled binary.
+          build.onLoad({ filter: /pdfjs-dist.*legacy.*pdf\.mjs$/ }, async (args) => {
+            let contents = await Bun.file(args.path).text()
+            const workerPath = path.resolve(pdfjsLegacy, "pdf.worker.mjs")
+            contents = contents.replace(
+              `const worker = await import(\n      /*webpackIgnore: true*/\n      /*@vite-ignore*/\n      this.workerSrc)`,
+              `const worker = await import(${JSON.stringify(workerPath)})`,
+            )
+            return { contents, loader: "js" }
+          })
+        },
+      },
+    ],
     sourcemap: "external",
     compile: {
       autoloadBunfig: false,

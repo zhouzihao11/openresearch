@@ -194,7 +194,7 @@ export function SessionTurn(
     return list(data.store.part?.[msg.id], emptyParts)
   })
 
-  const compaction = createMemo(() => parts().find((part) => part.type === "compaction"))
+  const compaction = createMemo(() => parts()?.find((part) => part.type === "compaction"))
 
   const diffs = createMemo(() => {
     const files = message()?.summary?.diffs
@@ -246,9 +246,9 @@ export function SessionTurn(
     { equals: same },
   )
 
-  const interrupted = createMemo(() => assistantMessages().some((m) => m.error?.name === "MessageAbortedError"))
+  const interrupted = createMemo(() => assistantMessages()?.some((m) => m.error?.name === "MessageAbortedError"))
   const error = createMemo(
-    () => assistantMessages().find((m) => m.error && m.error.name !== "MessageAbortedError")?.error,
+    () => assistantMessages()?.find((m) => m.error && m.error.name !== "MessageAbortedError")?.error,
   )
   const assistantCopyPart = createMemo(() => {
     const messages = assistantMessages()
@@ -291,7 +291,7 @@ export function SessionTurn(
     const start = message()?.time.created
     if (typeof start !== "number") return undefined
 
-    const end = assistantMessages().reduce<number | undefined>((max, item) => {
+    const end = (assistantMessages() ?? []).reduce<number | undefined>((max, item) => {
       const completed = item.time.completed
       if (typeof completed !== "number") return max
       if (max === undefined) return completed
@@ -303,13 +303,13 @@ export function SessionTurn(
     return end - start
   })
   const assistantVisible = createMemo(() =>
-    assistantMessages().reduce((count, message) => {
+    (assistantMessages() ?? []).reduce((count, message) => {
       const parts = list(data.store.part?.[message.id], emptyParts)
       return count + parts.filter((part) => partState(part, showReasoningSummaries()) === "visible").length
     }, 0),
   )
   const assistantTailVisible = createMemo(() =>
-    assistantMessages()
+    (assistantMessages() ?? [])
       .flatMap((message) => list(data.store.part?.[message.id], emptyParts))
       .flatMap((part) => {
         if (partState(part, showReasoningSummaries()) !== "visible") return []
@@ -319,7 +319,7 @@ export function SessionTurn(
       .at(-1),
   )
   const reasoningHeading = createMemo(() =>
-    assistantMessages()
+    (assistantMessages() ?? [])
       .flatMap((message) => list(data.store.part?.[message.id], emptyParts))
       .filter((part): part is PartType & { type: "reasoning"; text: string } => part.type === "reasoning")
       .map((part) => heading(part.text))
@@ -333,7 +333,7 @@ export function SessionTurn(
     if (showReasoningSummaries()) return assistantVisible() === 0
     return true
   })
-  const hasAssistant = createMemo(() => assistantMessages().length > 0)
+  const hasAssistant = createMemo(() => (assistantMessages()?.length ?? 0) > 0)
   const animateEnabled = createMemo(() => props.animate !== false)
   const [live, setLive] = createSignal(false)
   const thinkingOpen = createMemo(() => thinking() && (live() || !animateEnabled()))
