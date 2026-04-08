@@ -47,7 +47,19 @@ const createSchema = z.object({
 
 async function copyFile(src: string, dest: string) {
   if (!(await Filesystem.exists(src))) throw new Error(`file not found: ${src}`)
-  await fs.promises.cp(src, dest, { force: false, recursive: await Filesystem.isDir(src) })
+  const isDir = await Filesystem.isDir(src)
+  if (isDir) {
+    await fs.promises.cp(src, dest, {
+      force: false,
+      recursive: true,
+      filter: (source) => {
+        const basename = path.basename(source)
+        return basename !== ".keep"
+      },
+    })
+  } else {
+    await fs.promises.cp(src, dest, { force: false, recursive: false })
+  }
 }
 
 const uniqueID = () => crypto.randomUUID()
@@ -1916,9 +1928,7 @@ export const ResearchRoutes = new Hono()
         failed: "failed",
         canceled: "idle",
       }
-      const resolvedStatus = executionWatch
-        ? (executionStatusMap[executionWatch.status] ?? "pending")
-        : "pending"
+      const resolvedStatus = executionWatch ? (executionStatusMap[executionWatch.status] ?? "pending") : "pending"
 
       const atom = experiment.atom_id
         ? (Database.use((db) => db.select().from(AtomTable).where(eq(AtomTable.atom_id, experiment.atom_id!)).get()) ??
