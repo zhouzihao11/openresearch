@@ -684,6 +684,24 @@ export function AtomGraphView(props: {
     ro.observe(containerRef)
   })
 
+  // Reinitialize stateManager when researchProjectId changes
+  createEffect(() => {
+    const projectId = props.researchProjectId
+    if (stateManager && stateManager.getProjectId() !== projectId) {
+      stateManager = new GraphStateManager(projectId)
+      if (graph) {
+        const graphState = stateManager.loadState()
+        if (graphState == null) {
+          graph.render().then(() => {
+            saveCurrentState()
+          })
+        } else {
+          applySavedPositions(graphState).then(() => {})
+        }
+      }
+    }
+  })
+
   const toGraphData = () => {
     // Compute 2nd-order degree for each node (unique nodes reachable within 2 hops)
     const adj = new Map<string, Set<string>>()

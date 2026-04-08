@@ -28,7 +28,7 @@ import fs from "fs"
 import { rm } from "fs/promises"
 import { git } from "@/util/git"
 import { Research } from "@/research/research.ts"
-import { ensureGitignore, GIT_ENV, gitErr, ensureRepoInitialized } from "@/session/experiment-guard"
+import { ensureGitignore, GIT_ENV, gitErr } from "@/session/experiment-guard"
 import { Instance } from "@/project/instance"
 import { Snapshot } from "@/snapshot"
 import { computeExperimentDiff } from "@/util/git-diff"
@@ -47,19 +47,7 @@ const createSchema = z.object({
 
 async function copyFile(src: string, dest: string) {
   if (!(await Filesystem.exists(src))) throw new Error(`file not found: ${src}`)
-  const isDir = await Filesystem.isDir(src)
-  if (isDir) {
-    await fs.promises.cp(src, dest, {
-      force: false,
-      recursive: true,
-      filter: (source) => {
-        const basename = path.basename(source)
-        return basename !== ".keep"
-      },
-    })
-  } else {
-    await fs.promises.cp(src, dest, { force: false, recursive: false })
-  }
+  await fs.promises.cp(src, dest, { force: false, recursive: await Filesystem.isDir(src) })
 }
 
 const uniqueID = () => crypto.randomUUID()
@@ -288,12 +276,79 @@ export const ResearchRoutes = new Hono()
     }),
     async (c) => {
       const projectId = c.req.param("projectId")
-      const row = Database.use((db) =>
+      let row = Database.use((db) =>
         db.select().from(ResearchProjectTable).where(eq(ResearchProjectTable.project_id, projectId)).get(),
       )
+
+      // If not found in database, try to recover from memo file
       if (!row) {
+        console.log(`[research] Research project not found for project_id: ${projectId}, attempting recovery...`)
+        try {
+          let project
+          try {
+            project = await Project.get(projectId)
+          } catch (err) {
+            console.warn(`[research] Failed to get project ${projectId}:`, err)
+            project = undefined
+          }
+
+          if (project) {
+            console.log(`[research] Found project, checking for memo file at: ${project.worktree}`)
+            const memoPath = path.join(project.worktree, ".opencode-research.json")
+            if (await Filesystem.exists(memoPath)) {
+              console.log(`[research] Memo file found, reading...`)
+              const memo = await Filesystem.readJson<{ research_project_id: string; project_id: string }>(memoPath)
+              console.log(`[research] Memo content:`, memo)
+
+              // Check if this research project exists in database
+              const existingResearch = Database.use((db) =>
+                db
+                  .select()
+                  .from(ResearchProjectTable)
+                  .where(eq(ResearchProjectTable.research_project_id, memo.research_project_id))
+                  .get(),
+              )
+
+              if (existingResearch) {
+                console.log(`[research] Recovering project association: ${memo.research_project_id} -> ${projectId}`)
+                // Update the project_id to current one
+                Database.use((db) =>
+                  db
+                    .update(ResearchProjectTable)
+                    .set({ project_id: projectId, time_updated: Date.now() })
+                    .where(eq(ResearchProjectTable.research_project_id, memo.research_project_id))
+                    .run(),
+                )
+
+                // Fetch the updated row
+                row = Database.use((db) =>
+                  db.select().from(ResearchProjectTable).where(eq(ResearchProjectTable.project_id, projectId)).get(),
+                )
+                console.log(`[research] Recovery successful, row:`, row)
+              } else {
+                console.warn(
+                  `[research] Memo file found but research project not in database: ${memo.research_project_id}`,
+                )
+                console.warn(
+                  `[research] This usually means the project was deleted with removeLocal=true. The data cannot be recovered.`,
+                )
+              }
+            } else {
+              console.log(`[research] No memo file found at: ${memoPath}`)
+            }
+          } else {
+            console.log(`[research] Project not found: ${projectId}`)
+          }
+        } catch (err) {
+          console.warn("[research] Failed to recover research project from memo file:", err)
+        }
+      }
+
+      if (!row) {
+        console.log(`[research] Final result: no research project found for ${projectId}`)
         return c.json({ success: false, message: "no research project for this project" }, 404)
       }
+      console.log(`[research] Returning research project:`, row.research_project_id)
       return c.json(row)
     },
   )
@@ -737,11 +792,17 @@ export const ResearchRoutes = new Hono()
         // Delete experiment results directory
         const expDir = path.join(Instance.directory, "exp_results", exp.exp_id)
         await rm(expDir, { recursive: true, force: true }).catch(() => {})
-        // Remove experiment worktree and branch
+        // Delete experiment git branch
         if (exp.exp_branch_name) {
-          const baseRepo = path.resolve(exp.code_path, "../..")
-          await git(["worktree", "remove", exp.code_path, "--force"], { cwd: baseRepo }).catch(() => {})
-          await git(["branch", "-D", exp.exp_branch_name], { cwd: baseRepo }).catch(() => {})
+          const codePath = exp.code_path
+          const head = await git(["rev-parse", "--abbrev-ref", "HEAD"], { cwd: codePath }).catch(() => null)
+          const currentBranch = head?.stdout?.toString().trim()
+          if (currentBranch === exp.exp_branch_name) {
+            const baseline = exp.baseline_branch_name || "master"
+            await git(["checkout", "-f", baseline], { cwd: codePath }).catch(() => {})
+            await git(["clean", "-fd"], { cwd: codePath }).catch(() => {})
+          }
+          await git(["branch", "-D", exp.exp_branch_name], { cwd: codePath }).catch(() => {})
         }
       }
 
@@ -1034,6 +1095,22 @@ export const ResearchRoutes = new Hono()
           macro_table_path: null,
         }
       })
+
+      // Write research project ID to a memo file in the project directory
+      // This allows recovery of the association if the project is deleted and reloaded
+      const memoPath = path.join(target, ".opencode-research.json")
+      await Filesystem.write(
+        memoPath,
+        JSON.stringify(
+          {
+            research_project_id: result.research_project_id,
+            project_id: result.project_id,
+            created_at: Date.now(),
+          },
+          null,
+          2,
+        ),
+      )
 
       return c.json(result)
     },
@@ -1701,15 +1778,7 @@ export const ResearchRoutes = new Hono()
       await Filesystem.write(path.join(expDir, ".keep"), "")
       await Filesystem.write(expPlanPath, "")
 
-      // Ensure repo is initialised and create worktree for the experiment
-      const initResult = await ensureRepoInitialized(body.codePath)
-      if (!initResult.ok) {
-        return c.json(
-          { success: false, message: `Failed to initialise repo at ${body.codePath}: ${initResult.message}` },
-          400,
-        )
-      }
-
+      // Create experiment branch from baseline without switching (won't affect running experiments)
       const baselineExists = await git(["rev-parse", "--verify", body.baselineBranch], { cwd: body.codePath })
       if (baselineExists.exitCode !== 0) {
         return c.json(
@@ -1717,17 +1786,12 @@ export const ResearchRoutes = new Hono()
           400,
         )
       }
-
-      const worktreePath = path.join(body.codePath, ".openresearch_worktrees", expId)
-      const createWorktree = await git(
-        ["worktree", "add", worktreePath, body.baselineBranch, "-b", expId],
-        { cwd: body.codePath, env: GIT_ENV },
-      )
-      if (createWorktree.exitCode !== 0) {
+      const createBranch = await git(["branch", expId, body.baselineBranch], { cwd: body.codePath })
+      if (createBranch.exitCode !== 0) {
         return c.json(
           {
             success: false,
-            message: `failed to create worktree for ${expId}: ${createWorktree.stderr?.toString().trim() || "unknown error"}`,
+            message: `failed to create branch ${expId} from ${body.baselineBranch}: ${createBranch.stderr?.toString().trim() || "unknown error"}`,
           },
           400,
         )
@@ -1748,7 +1812,7 @@ export const ResearchRoutes = new Hono()
             exp_result_path: expResultPath,
             exp_result_summary_path: expResultSummaryPath,
             exp_plan_path: expPlanPath,
-            code_path: worktreePath,
+            code_path: body.codePath,
             remote_server_id: body.remoteServerId ?? null,
             status: "pending",
             time_created: now,
@@ -1830,9 +1894,9 @@ export const ResearchRoutes = new Hono()
   .post(
     "/experiment/:expId/ready",
     describeRoute({
-      summary: "Check experiment environment readiness",
+      summary: "Prepare experiment environment",
       description:
-        "Check that the experiment worktree directory exists and is ready for use.",
+        "Initialise git if needed, check for conflicts with other running experiments on the same article, and switch to the experiment branch.",
       operationId: "research.experiment.ready",
       responses: {
         200: {
@@ -1844,15 +1908,29 @@ export const ResearchRoutes = new Hono()
           },
         },
         404: {
-          description: "Experiment not found",
+          description: "Experiment, atom, or article not found",
           content: {
             "application/json": {
               schema: resolver(z.object({ ready: z.literal(false), message: z.string() })),
             },
           },
         },
+        409: {
+          description: "Another experiment is already running on the same article",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.object({
+                  ready: z.literal(false),
+                  message: z.string(),
+                  conflicts: z.array(z.object({ exp_id: z.string(), exp_session_id: z.string().nullable() })),
+                }),
+              ),
+            },
+          },
+        },
         500: {
-          description: "Worktree directory does not exist",
+          description: "Git or branch operation failed",
           content: {
             "application/json": {
               schema: resolver(z.object({ ready: z.literal(false), message: z.string() })),
@@ -1872,6 +1950,8 @@ export const ResearchRoutes = new Hono()
       switch (result.reason) {
         case "not_found":
           return c.json({ ready: false as const, message: result.message }, 404)
+        case "conflict":
+          return c.json({ ready: false as const, message: result.message, conflicts: result.conflicts }, 409)
         case "git_error":
           return c.json({ ready: false as const, message: result.message }, 500)
       }
@@ -2515,11 +2595,18 @@ export const ResearchRoutes = new Hono()
       // Delete experiment results directory
       const expDir = path.join(Instance.directory, "exp_results", expId)
       await rm(expDir, { recursive: true, force: true }).catch(() => {})
-      // Remove experiment worktree and branch from the code repo
+      // Delete experiment branch from the code repo
       if (experiment.exp_branch_name) {
-        const baseRepo = path.resolve(experiment.code_path, "../..")
-        await git(["worktree", "remove", experiment.code_path, "--force"], { cwd: baseRepo }).catch(() => {})
-        await git(["branch", "-D", experiment.exp_branch_name], { cwd: baseRepo }).catch(() => {})
+        const codePath = experiment.code_path
+        // Check if we're on the experiment branch; if so, switch away first
+        const head = await git(["rev-parse", "--abbrev-ref", "HEAD"], { cwd: codePath })
+        const currentBranch = head.stdout?.toString().trim()
+        if (currentBranch === experiment.exp_branch_name) {
+          const baseline = experiment.baseline_branch_name || "master"
+          await git(["checkout", "-f", baseline], { cwd: codePath }).catch(() => {})
+          await git(["clean", "-fd"], { cwd: codePath }).catch(() => {})
+        }
+        await git(["branch", "-D", experiment.exp_branch_name], { cwd: codePath }).catch(() => {})
       }
       return c.json({ success: true })
     },

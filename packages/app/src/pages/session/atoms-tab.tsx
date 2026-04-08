@@ -168,7 +168,8 @@ export function AtomsTab(props: { researchProjectId: string; currentSessionId?: 
     }
   }
 
-  onMount(() => {
+  createEffect(() => {
+    const projectId = props.researchProjectId
     fetchAtoms().then((r) => {})
   })
 
@@ -177,11 +178,6 @@ export function AtomsTab(props: { researchProjectId: string; currentSessionId?: 
       fetchAtoms().then((r) => {})
     })
     onCleanup(unsub)
-  })
-
-  createEffect(() => {
-    const projectId = props.researchProjectId
-    fetchAtoms().then((r) => {})
   })
 
   // Save subTab state to localStorage when it changes

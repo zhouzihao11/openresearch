@@ -68,11 +68,6 @@ export function CodesTab(props: { researchProjectId: string }) {
     return map
   }
 
-  onMount(() => {
-    fetchCodes()
-    fetchArticles()
-  })
-
   createEffect(() => {
     const projectId = props.researchProjectId
     fetchCodes()
