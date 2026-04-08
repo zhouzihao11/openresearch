@@ -28,7 +28,7 @@ import fs from "fs"
 import { rm } from "fs/promises"
 import { git } from "@/util/git"
 import { Research } from "@/research/research.ts"
-import { ensureGitignore, GIT_ENV, gitErr } from "@/session/experiment-guard"
+import { ensureGitignore, GIT_ENV, gitErr, ensureRepoInitialized } from "@/session/experiment-guard"
 import { Instance } from "@/project/instance"
 import { Snapshot } from "@/snapshot"
 import { computeExperimentDiff } from "@/util/git-diff"
@@ -725,17 +725,11 @@ export const ResearchRoutes = new Hono()
         // Delete experiment results directory
         const expDir = path.join(Instance.directory, "exp_results", exp.exp_id)
         await rm(expDir, { recursive: true, force: true }).catch(() => {})
-        // Delete experiment git branch
+        // Remove experiment worktree and branch
         if (exp.exp_branch_name) {
-          const codePath = exp.code_path
-          const head = await git(["rev-parse", "--abbrev-ref", "HEAD"], { cwd: codePath }).catch(() => null)
-          const currentBranch = head?.stdout?.toString().trim()
-          if (currentBranch === exp.exp_branch_name) {
-            const baseline = exp.baseline_branch_name || "master"
-            await git(["checkout", "-f", baseline], { cwd: codePath }).catch(() => {})
-            await git(["clean", "-fd"], { cwd: codePath }).catch(() => {})
-          }
-          await git(["branch", "-D", exp.exp_branch_name], { cwd: codePath }).catch(() => {})
+          const baseRepo = path.resolve(exp.code_path, "../..")
+          await git(["worktree", "remove", exp.code_path, "--force"], { cwd: baseRepo }).catch(() => {})
+          await git(["branch", "-D", exp.exp_branch_name], { cwd: baseRepo }).catch(() => {})
         }
       }
 
@@ -1695,7 +1689,15 @@ export const ResearchRoutes = new Hono()
       await Filesystem.write(path.join(expDir, ".keep"), "")
       await Filesystem.write(expPlanPath, "")
 
-      // Create experiment branch from baseline without switching (won't affect running experiments)
+      // Ensure repo is initialised and create worktree for the experiment
+      const initResult = await ensureRepoInitialized(body.codePath)
+      if (!initResult.ok) {
+        return c.json(
+          { success: false, message: `Failed to initialise repo at ${body.codePath}: ${initResult.message}` },
+          400,
+        )
+      }
+
       const baselineExists = await git(["rev-parse", "--verify", body.baselineBranch], { cwd: body.codePath })
       if (baselineExists.exitCode !== 0) {
         return c.json(
@@ -1703,12 +1705,17 @@ export const ResearchRoutes = new Hono()
           400,
         )
       }
-      const createBranch = await git(["branch", expId, body.baselineBranch], { cwd: body.codePath })
-      if (createBranch.exitCode !== 0) {
+
+      const worktreePath = path.join(body.codePath, ".openresearch_worktrees", expId)
+      const createWorktree = await git(
+        ["worktree", "add", worktreePath, body.baselineBranch, "-b", expId],
+        { cwd: body.codePath, env: GIT_ENV },
+      )
+      if (createWorktree.exitCode !== 0) {
         return c.json(
           {
             success: false,
-            message: `failed to create branch ${expId} from ${body.baselineBranch}: ${createBranch.stderr?.toString().trim() || "unknown error"}`,
+            message: `failed to create worktree for ${expId}: ${createWorktree.stderr?.toString().trim() || "unknown error"}`,
           },
           400,
         )
@@ -1729,7 +1736,7 @@ export const ResearchRoutes = new Hono()
             exp_result_path: expResultPath,
             exp_result_summary_path: expResultSummaryPath,
             exp_plan_path: expPlanPath,
-            code_path: body.codePath,
+            code_path: worktreePath,
             remote_server_id: body.remoteServerId ?? null,
             status: "pending",
             time_created: now,
@@ -1811,9 +1818,9 @@ export const ResearchRoutes = new Hono()
   .post(
     "/experiment/:expId/ready",
     describeRoute({
-      summary: "Prepare experiment environment",
+      summary: "Check experiment environment readiness",
       description:
-        "Initialise git if needed, check for conflicts with other running experiments on the same article, and switch to the experiment branch.",
+        "Check that the experiment worktree directory exists and is ready for use.",
       operationId: "research.experiment.ready",
       responses: {
         200: {
@@ -1825,29 +1832,15 @@ export const ResearchRoutes = new Hono()
           },
         },
         404: {
-          description: "Experiment, atom, or article not found",
+          description: "Experiment not found",
           content: {
             "application/json": {
               schema: resolver(z.object({ ready: z.literal(false), message: z.string() })),
             },
           },
         },
-        409: {
-          description: "Another experiment is already running on the same article",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  ready: z.literal(false),
-                  message: z.string(),
-                  conflicts: z.array(z.object({ exp_id: z.string(), exp_session_id: z.string().nullable() })),
-                }),
-              ),
-            },
-          },
-        },
         500: {
-          description: "Git or branch operation failed",
+          description: "Worktree directory does not exist",
           content: {
             "application/json": {
               schema: resolver(z.object({ ready: z.literal(false), message: z.string() })),
@@ -1867,8 +1860,6 @@ export const ResearchRoutes = new Hono()
       switch (result.reason) {
         case "not_found":
           return c.json({ ready: false as const, message: result.message }, 404)
-        case "conflict":
-          return c.json({ ready: false as const, message: result.message, conflicts: result.conflicts }, 409)
         case "git_error":
           return c.json({ ready: false as const, message: result.message }, 500)
       }
@@ -2514,18 +2505,11 @@ export const ResearchRoutes = new Hono()
       // Delete experiment results directory
       const expDir = path.join(Instance.directory, "exp_results", expId)
       await rm(expDir, { recursive: true, force: true }).catch(() => {})
-      // Delete experiment branch from the code repo
+      // Remove experiment worktree and branch from the code repo
       if (experiment.exp_branch_name) {
-        const codePath = experiment.code_path
-        // Check if we're on the experiment branch; if so, switch away first
-        const head = await git(["rev-parse", "--abbrev-ref", "HEAD"], { cwd: codePath })
-        const currentBranch = head.stdout?.toString().trim()
-        if (currentBranch === experiment.exp_branch_name) {
-          const baseline = experiment.baseline_branch_name || "master"
-          await git(["checkout", "-f", baseline], { cwd: codePath }).catch(() => {})
-          await git(["clean", "-fd"], { cwd: codePath }).catch(() => {})
-        }
-        await git(["branch", "-D", experiment.exp_branch_name], { cwd: codePath }).catch(() => {})
+        const baseRepo = path.resolve(experiment.code_path, "../..")
+        await git(["worktree", "remove", experiment.code_path, "--force"], { cwd: baseRepo }).catch(() => {})
+        await git(["branch", "-D", experiment.exp_branch_name], { cwd: baseRepo }).catch(() => {})
       }
       return c.json({ success: true })
     },

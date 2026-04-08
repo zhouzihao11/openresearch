@@ -572,17 +572,11 @@ export const AtomDeleteTool = Tool.define("atom_delete", {
         // Delete experiment results directory
         const expDir = path.join(Instance.directory, "exp_results", exp.exp_id)
         await rm(expDir, { recursive: true, force: true }).catch(() => {})
-        // Delete experiment git branch
+        // Remove experiment worktree and branch
         if (exp.exp_branch_name) {
-          const codePath = exp.code_path
-          const head = await git(["rev-parse", "--abbrev-ref", "HEAD"], { cwd: codePath }).catch(() => null)
-          const currentBranch = head?.stdout?.toString().trim()
-          if (currentBranch === exp.exp_branch_name) {
-            const baseline = exp.baseline_branch_name || "master"
-            await git(["checkout", "-f", baseline], { cwd: codePath }).catch(() => {})
-            await git(["clean", "-fd"], { cwd: codePath }).catch(() => {})
-          }
-          await git(["branch", "-D", exp.exp_branch_name], { cwd: codePath }).catch(() => {})
+          const baseRepo = path.resolve(exp.code_path, "../..")
+          await git(["worktree", "remove", exp.code_path, "--force"], { cwd: baseRepo }).catch(() => {})
+          await git(["branch", "-D", exp.exp_branch_name], { cwd: baseRepo }).catch(() => {})
         }
       }
     }
