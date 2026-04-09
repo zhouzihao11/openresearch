@@ -231,10 +231,6 @@ export function SessionWorkflowDock(props: {
               {(summary) => <div class="text-13-regular text-text-base">{summary()}</div>}
             </Show>
 
-            <Show when={!props.workflow.instance.current_step && props.workflow.flow_summary}>
-              <div class="text-13-regular text-text-base whitespace-pre-wrap">{props.workflow.flow_summary}</div>
-            </Show>
-
             {props.workflow.instance.status === "failed" && props.workflow.instance.current_step?.result ? (
               <div class="rounded-md border border-border-weak bg-background-panel px-3 py-2 flex flex-col gap-1">
                 <div class="text-12-medium text-text-weak">

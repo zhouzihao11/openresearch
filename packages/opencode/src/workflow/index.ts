@@ -82,6 +82,7 @@ export namespace Workflow {
             title: z.string(),
             summary: z.string(),
             prompt: z.string(),
+            policy: Policy,
             status: z.enum(["pending", "active", "done", "waiting_interaction", "skipped"]),
             result: z.record(z.string(), z.unknown()).optional(),
             interaction: z
@@ -184,6 +185,7 @@ export namespace Workflow {
             title: step.title,
             summary: step.summary,
             prompt: step.prompt,
+            policy: step.policy,
             status: step.status,
             result: step.result,
             interaction: step.interaction,

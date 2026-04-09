@@ -6,7 +6,8 @@ You must do the following before leaving this step:
 
 1. Confirm that this is the first real step entered after the flow summary stage.
 2. Call `workflow.inspect` for the current instance.
-3. When calling `workflow.next`, include this `context_patch`:
+3. talk what you can do in workflow, and its condition.
+4. When calling `workflow.next`, include this `context_patch`:
 
 ```json
 {

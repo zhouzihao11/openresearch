@@ -10,6 +10,7 @@ Use it when you need to:
 
 Rules:
 - You must not assume workflow progress without calling this tool
+- After `start`, you MUST reuse the returned `instance_id` in every later `next`, `edit`, `wait_interaction`, and `fail` call for that workflow
 - Only future steps can be edited
 - When the workflow is waiting for user input, stop and wait for the user's next message. The system will automatically resume the waiting step.
 - If the workflow cannot be solved, call `fail` with a clear user-facing reason.
@@ -23,7 +24,33 @@ Important schema reminders:
 - `instance_id` is returned by `start` and must be reused in later calls
 - `edit.ops` must be an array, never a string
 - `insert_after_current` must reference predefined step kinds from the template, not custom step content
+- `next`, `edit`, `wait_interaction`, and `fail` all require `instance_id`
 - Valid edit examples:
+
+Minimal correct call sequence:
+
+```json
+{
+  "action": "start",
+  "template_id": "experiment_execution_v1",
+  "flow": "default"
+}
+```
+
+Then read the returned `instance_id` and reuse it:
+
+```json
+{
+  "action": "next",
+  "instance_id": "wf_123",
+  "result": {
+    "summary": "Finished the current step"
+  },
+  "context_patch": {
+    "some_key": "some_value"
+  }
+}
+```
 
 ```json
 {
@@ -32,7 +59,7 @@ Important schema reminders:
   "ops": [
     {
       "type": "insert_after_current",
-      "kinds": ["setup_env_retry", "run_experiment_retry"]
+      "kinds": ["setup_env", "run_experiment"]
     }
   ]
 }

@@ -89,6 +89,21 @@ function steps(meta: Workflow.Meta) {
   return meta.instance.steps.map((step) => `- ${step.id} | ${step.kind} | ${step.status}`).join("\n")
 }
 
+function policy(meta: Workflow.Meta) {
+  const step = meta.instance.current_step
+  if (!step) return
+  return [
+    "Step policy:",
+    `- next allowed: yes`,
+    `- next conditions: ${step.policy.can_next.length ? "" : "none"}`,
+    ...(step.policy.can_next.length ? step.policy.can_next.map((item) => `  - ${item}`) : []),
+    `- wait_interaction allowed: ${step.policy.can_wait_interaction ? "yes" : "no"}`,
+    `- edit_future allowed: ${step.policy.can_edit_future ? "yes" : "no"}`,
+    `- allowed edit ops: ${step.policy.allowed_edit_ops.length ? "" : "none"}`,
+    ...(step.policy.allowed_edit_ops.length ? step.policy.allowed_edit_ops.map((item) => `  - ${item}`) : []),
+  ].join("\n")
+}
+
 async function docs(meta: Workflow.Meta) {
   return {
     flow: WorkflowTemplates.flow(meta.instance.template_id, meta.instance.flow_id),
@@ -119,6 +134,7 @@ async function output(meta: Workflow.Meta, content: Awaited<ReturnType<typeof do
     "",
     step ? "Current step instructions:" : "Flow summary:",
     step ? (content.prompt ?? "No step prompt found.") : (content.summary ?? "No flow summary found."),
+    ...(step ? ["", policy(meta) ?? ""] : []),
     "",
     "Context:",
     format(meta.instance.context),

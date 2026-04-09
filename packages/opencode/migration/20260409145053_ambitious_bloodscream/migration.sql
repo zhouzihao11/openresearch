@@ -2,6 +2,7 @@ CREATE TABLE `workflow_instance` (
 	`id` text PRIMARY KEY,
 	`session_id` text NOT NULL,
 	`template_id` text NOT NULL,
+	`flow_id` text NOT NULL,
 	`template_version` text NOT NULL,
 	`title` text NOT NULL,
 	`status` text NOT NULL,

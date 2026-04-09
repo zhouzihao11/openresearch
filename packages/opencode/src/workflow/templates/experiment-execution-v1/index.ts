@@ -6,7 +6,8 @@ export const ExperimentExecutionWorkflowTemplate = WorkflowSchema.Template.parse
   id: "experiment_execution_v1",
   name: "Experiment Execution Workflow",
   version: "1.0",
-  description: "Linear experiment execution flow with editable future steps and user review checkpoints.",
+  description:
+    "Experiment execution flow that keeps the primary agent thin by pushing planning, coding, deployment, resource preparation, run, and recovery rules into workflow steps.",
   defs: {
     gather_info: {
       kind: "gather_info",
@@ -64,13 +65,6 @@ export const ExperimentExecutionWorkflowTemplate = WorkflowSchema.Template.parse
       prompt: "setup-env",
       policy: { can_next: [], can_wait_interaction: false, can_edit_future: false, allowed_edit_ops: [] },
     },
-    setup_env_retry: {
-      kind: "setup_env_retry",
-      title: "Prepare remote environment",
-      summary: "Retry remote environment setup after a failed run.",
-      prompt: "setup-env-retry",
-      policy: { can_next: [], can_wait_interaction: false, can_edit_future: false, allowed_edit_ops: [] },
-    },
     prepare_resources: {
       kind: "prepare_resources",
       title: "Prepare remote resources",
@@ -88,18 +82,6 @@ export const ExperimentExecutionWorkflowTemplate = WorkflowSchema.Template.parse
       title: "Launch experiment",
       summary: "Invoke experiment_run with resolved resources and W&B arguments.",
       prompt: "run-experiment",
-      policy: {
-        can_next: [],
-        can_wait_interaction: false,
-        can_edit_future: true,
-        allowed_edit_ops: ["insert", "delete"],
-      },
-    },
-    run_experiment_retry: {
-      kind: "run_experiment_retry",
-      title: "Launch experiment",
-      summary: "Retry experiment run after the environment or code was repaired.",
-      prompt: "run-experiment-retry",
       policy: {
         can_next: [],
         can_wait_interaction: false,
@@ -161,10 +143,35 @@ export const ExperimentExecutionWorkflowTemplate = WorkflowSchema.Template.parse
       summary: "rerun-only",
       steps: ["gather_info", "confirm_config", "setup_env", "prepare_resources", "run_experiment", "register_watch"],
     },
-    failure_recovery: {
-      title: "Failure Recovery",
-      summary: "failure-recovery",
-      steps: ["gather_info", "setup_env_retry", "run_experiment_retry", "report_failure"],
+    code_rerun: {
+      title: "Code Rerun",
+      summary: "code-rerun",
+      steps: [
+        "gather_info",
+        "confirm_config",
+        "coding",
+        "run_user_review",
+        "deploy_code",
+        "run_experiment",
+        "register_watch",
+        "record_success",
+        "commit_changes",
+      ],
+    },
+    env_rerun: {
+      title: "Environment Rerun",
+      summary: "env-rerun",
+      steps: ["gather_info", "confirm_config", "setup_env", "run_experiment", "register_watch"],
+    },
+    resource_rerun: {
+      title: "Resource Rerun",
+      summary: "resource-rerun",
+      steps: ["gather_info", "confirm_config", "prepare_resources", "run_experiment", "register_watch"],
+    },
+    run_only: {
+      title: "Run Only",
+      summary: "run-only",
+      steps: ["gather_info", "confirm_config", "run_experiment", "register_watch"],
     },
   },
   default_flow: "default",

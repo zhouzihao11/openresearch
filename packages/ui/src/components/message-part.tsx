@@ -1660,9 +1660,6 @@ ToolRegistry.register({
                 <Show when={!inst().current_step}>
                   <div class="text-text-base">{i18n.t("ui.workflow.flowSummaryHint")}</div>
                 </Show>
-                <Show when={!inst().current_step && meta().flow_summary}>
-                  <div class="text-text-base whitespace-pre-wrap">{meta().flow_summary}</div>
-                </Show>
                 {inst().status === "failed" && inst().current_step?.result ? (
                   <div class="rounded-md border border-border-weak bg-background-panel px-3 py-2 text-text-strong whitespace-pre-wrap">
                     <div class="text-12-medium text-text-weak mb-1">{failLabel()}</div>
