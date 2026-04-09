@@ -58,6 +58,11 @@ export function AtomDetailFullscreen(props: {
       () => [props.visible, props.focusAtomId] as const,
       ([visible, focusId]) => {
         if (visible && focusId) {
+          setOpenExpId(null)
+          setExpSessionId(null)
+          setAtomSessionId(null)
+          setChatOpen(false)
+          setFileDetail(null)
           setSelectedAtomId(focusId)
         }
       },
