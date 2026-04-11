@@ -736,7 +736,7 @@ export type WorkflowStepPolicy = {
 }
 
 export type WorkflowMetadata = {
-  action: "start" | "enter" | "next" | "edit" | "wait_interaction" | "fail" | "inspect"
+  action: "start" | "next" | "edit" | "wait_interaction" | "fail" | "inspect"
   instance: {
     id: string
     template_id: string

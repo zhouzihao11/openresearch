@@ -67,7 +67,7 @@ export namespace Workflow {
 
   export const Meta = z
     .object({
-      action: z.enum(["start", "enter", "next", "edit", "wait_interaction", "fail", "inspect"]),
+      action: z.enum(["start", "next", "edit", "wait_interaction", "fail", "inspect"]),
       instance: z.object({
         id: z.string(),
         template_id: z.string(),
@@ -470,16 +470,6 @@ export namespace Workflow {
     return build("start", inst)
   }
 
-  export function enter(input: { sessionID: string; instanceID: string }) {
-    const inst = load(input.instanceID)
-    owns(inst, input.sessionID)
-    if (inst.current_index < 0) {
-      raise("ENTER_NOT_ALLOWED", "Workflow has not entered the first step yet. Call next to enter the first step.")
-    }
-    write(inst)
-    return build("enter", inst)
-  }
-
   export function inspect(input: { sessionID: string; instanceID: string }) {
     const inst = load(input.instanceID)
     owns(inst, input.sessionID)
@@ -634,7 +624,6 @@ export namespace Workflow {
     }
 
     write(inst)
-    publish("enter", inst)
   }
 
   export function fail(input: {
