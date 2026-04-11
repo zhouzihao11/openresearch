@@ -2825,6 +2825,7 @@ export const ResearchRoutes = new Hono()
         const metadata = {
           version: "1.0",
           exported_at: Date.now(),
+          source_worktree: project.worktree,
           research_project: researchProject,
           atoms,
           atom_relations: relations,
@@ -2897,6 +2898,25 @@ export const ResearchRoutes = new Hono()
               await zipWriter.add(`articles/${filename}`, new BlobReader(new Blob([new Uint8Array(content)])))
             }
           }
+        }
+
+        // Add entire code directory (including .git, worktrees, etc.)
+        const codeRootDir = path.join(project.worktree, "code")
+        if (await Filesystem.exists(codeRootDir)) {
+          const addDirToZip = async (dir: string, prefix: string) => {
+            const entries = await fs.promises.readdir(dir, { withFileTypes: true })
+            for (const entry of entries) {
+              const fullPath = path.join(dir, entry.name)
+              const entryZipPath = `${prefix}/${entry.name}`
+              if (entry.isDirectory()) {
+                await addDirToZip(fullPath, entryZipPath)
+              } else {
+                const content = await fs.promises.readFile(fullPath)
+                await zipWriter.add(entryZipPath, new BlobReader(new Blob([new Uint8Array(content)])))
+              }
+            }
+          }
+          await addDirToZip(codeRootDir, "code")
         }
 
         // Add experiment results
@@ -3039,6 +3059,7 @@ export const ResearchRoutes = new Hono()
 
         const metadata = await Filesystem.readJson<{
           version: string
+          source_worktree?: string
           research_project: typeof ResearchProjectTable.$inferSelect
           atoms: (typeof AtomTable.$inferSelect)[]
           atom_relations: (typeof AtomRelationTable.$inferSelect)[]
@@ -3248,29 +3269,24 @@ export const ResearchRoutes = new Hono()
             )
           }
 
-          // Import experiments (without sessions and branches)
+          // Import experiments (keep original exp_id to match existing worktrees)
           for (const exp of metadata.experiments) {
-            const newExpId = uniqueID()
-            oldToNewExpId.set(exp.exp_id, newExpId)
+            oldToNewExpId.set(exp.exp_id, exp.exp_id)
 
-            const expDir = path.join(targetDir, "exp_results", newExpId)
-            const oldExpDir = path.join(targetDir, "exp_results", exp.exp_id)
-
-            // Rename experiment directory
-            if (fs.existsSync(oldExpDir)) {
-              fs.renameSync(oldExpDir, expDir)
-            }
+            const expDir = path.join(targetDir, "exp_results", exp.exp_id)
+            const codeName = path.basename(path.resolve(exp.code_path, "../.."))
+            const newCodePath = path.join(targetDir, "code", codeName, ".openresearch_worktrees", exp.exp_id)
 
             Database.use((db) =>
               db
                 .insert(ExperimentTable)
                 .values({
-                  exp_id: newExpId,
+                  exp_id: exp.exp_id,
                   research_project_id: newResearchProjectId,
                   exp_name: exp.exp_name,
                   exp_session_id: null, // Sessions are not imported
                   baseline_branch_name: exp.baseline_branch_name,
-                  exp_branch_name: null, // Branches are not imported
+                  exp_branch_name: exp.exp_branch_name,
                   exp_result_path: expDir,
                   atom_id: exp.atom_id ? (oldToNewAtomId.get(exp.atom_id) ?? null) : null,
                   exp_result_summary_path: exp.exp_result_summary_path
@@ -3278,7 +3294,7 @@ export const ResearchRoutes = new Hono()
                     : null,
                   exp_plan_path: exp.exp_plan_path ? path.join(expDir, path.basename(exp.exp_plan_path)) : null,
                   remote_server_id: null, // Remote servers are not imported
-                  code_path: exp.code_path,
+                  code_path: newCodePath,
                   status: "idle",
                   started_at: null,
                   finished_at: null,
@@ -3289,11 +3305,133 @@ export const ResearchRoutes = new Hono()
             )
           }
 
+          // Import experiment watches
+          if (metadata.watches) {
+            for (const w of metadata.watches.experiment_watches ?? []) {
+              const newExpId = oldToNewExpId.get(w.exp_id)
+              if (!newExpId) continue
+              Database.use((db) =>
+                db
+                  .insert(ExperimentWatchTable)
+                  .values({
+                    watch_id: uniqueID(),
+                    exp_id: newExpId,
+                    wandb_entity: w.wandb_entity,
+                    wandb_project: w.wandb_project,
+                    wandb_api_key: w.wandb_api_key,
+                    wandb_run_id: w.wandb_run_id,
+                    status: w.status,
+                    last_polled_at: w.last_polled_at,
+                    wandb_state: w.wandb_state,
+                    error_message: w.error_message,
+                    time_created: now,
+                    time_updated: now,
+                  })
+                  .run(),
+              )
+            }
+
+            for (const w of metadata.watches.experiment_execution_watches ?? []) {
+              const newExpId = oldToNewExpId.get(w.exp_id)
+              if (!newExpId) continue
+              Database.use((db) =>
+                db
+                  .insert(ExperimentExecutionWatchTable)
+                  .values({
+                    watch_id: uniqueID(),
+                    exp_id: newExpId,
+                    status: w.status,
+                    stage: w.stage,
+                    title: w.title,
+                    message: w.message,
+                    wandb_entity: w.wandb_entity,
+                    wandb_project: w.wandb_project,
+                    wandb_run_id: w.wandb_run_id,
+                    error_message: w.error_message,
+                    started_at: w.started_at,
+                    finished_at: w.finished_at,
+                    time_created: now,
+                    time_updated: now,
+                  })
+                  .run(),
+              )
+            }
+
+            for (const w of metadata.watches.local_download_watches ?? []) {
+              const newExpId = oldToNewExpId.get(w.exp_id)
+              if (!newExpId) continue
+              Database.use((db) =>
+                db
+                  .insert(LocalDownloadWatchTable)
+                  .values({
+                    watch_id: uniqueID(),
+                    exp_id: newExpId,
+                    resource_key: w.resource_key,
+                    resource_name: w.resource_name,
+                    resource_type: w.resource_type,
+                    status: w.status,
+                    local_resource_root: w.local_resource_root,
+                    local_path: w.local_path,
+                    pid: null,
+                    log_path: w.log_path,
+                    status_path: w.status_path,
+                    source_selection: w.source_selection,
+                    method: w.method,
+                    error_message: w.error_message,
+                    last_polled_at: w.last_polled_at,
+                    time_created: now,
+                    time_updated: now,
+                  })
+                  .run(),
+              )
+            }
+          }
+
           return {
             project_id: project.project.id,
             research_project_id: newResearchProjectId,
           }
         })
+
+        // Fix git worktree absolute paths
+        if (metadata.source_worktree) {
+          const codeDir = path.join(targetDir, "code")
+          if (await Filesystem.exists(codeDir)) {
+            const codeEntries = await fs.promises.readdir(codeDir, { withFileTypes: true })
+            for (const codeEntry of codeEntries) {
+              if (!codeEntry.isDirectory()) continue
+              const repoDir = path.join(codeDir, codeEntry.name)
+              const gitWorktreesDir = path.join(repoDir, ".git", "worktrees")
+              if (!(await Filesystem.exists(gitWorktreesDir))) continue
+
+              const wtEntries = await fs.promises.readdir(gitWorktreesDir, { withFileTypes: true })
+              for (const wtEntry of wtEntries) {
+                if (!wtEntry.isDirectory()) continue
+                // Fix .git/worktrees/<name>/gitdir -> points to worktree's .git file
+                const gitdirFile = path.join(gitWorktreesDir, wtEntry.name, "gitdir")
+                if (await Filesystem.exists(gitdirFile)) {
+                  const content = (await fs.promises.readFile(gitdirFile, "utf-8")).trim()
+                  const fixed = content.replace(metadata.source_worktree, targetDir)
+                  await fs.promises.writeFile(gitdirFile, fixed + "\n")
+                }
+              }
+
+              // Fix worktree .git files -> point back to main repo's .git/worktrees/<name>
+              const worktreesRoot = path.join(repoDir, ".openresearch_worktrees")
+              if (!(await Filesystem.exists(worktreesRoot))) continue
+              const expEntries = await fs.promises.readdir(worktreesRoot, { withFileTypes: true })
+              for (const expEntry of expEntries) {
+                if (!expEntry.isDirectory()) continue
+                const dotGitFile = path.join(worktreesRoot, expEntry.name, ".git")
+                if (await Filesystem.exists(dotGitFile)) {
+                  const content = (await fs.promises.readFile(dotGitFile, "utf-8")).trim()
+                  const fixed = content.replace(metadata.source_worktree, targetDir)
+                  await fs.promises.writeFile(dotGitFile, fixed + "\n")
+                }
+              }
+            }
+          }
+        }
 
         // Write memo file
         const memoPath = path.join(targetDir, ".opencode-research.json")
