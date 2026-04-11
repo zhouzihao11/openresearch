@@ -145,6 +145,53 @@ buildCommunityPrompt(
 
 ---
 
+### 2026-04-11 - 测试补全 + 文档与 Agent 集成 ✅
+
+**实现内容**:
+
+#### 测试修复与编写
+
+- 修复 `community.test.ts` 的三类数据库依赖问题:
+  - `research_project_id` NOT NULL 约束 → 添加 `createResearchProject()` helper
+  - `session_id` FK 约束 → 移除无效的 session_id 引用
+  - atom_id UNIQUE 约束 → 使用 `crypto.randomUUID()` 生成唯一 ID
+- 编写 Phase 2 测试 (42 tests):
+  - `embedding.test.ts` (6): 生成/缓存/相似度/持久化/边界/批量
+  - `scoring.test.ts` (10): 5 维度单独验证 + 综合排序 + 自定义权重 + MMR + 分数解释
+  - `token-budget.test.ts` (13): 4 种文本估算 + 预算选择/优先级/严格预算 + 自适应 + 报告
+  - `hybrid.test.ts` (8): BFS 遍历 + 关系/类型过滤 + 语义搜索 + 去重 + token 集成
+- 编写 Phase 3 增强测试 (23 tests):
+  - `community-advanced.test.ts` (13): 隔离子图分社区/主导类型/密度/摘要/查询/过滤/缓存/边界
+  - `builder.test.ts` (9): GraphRAG/Compact prompt + 社区 prompt + evidence/metadata 开关
+  - `community-filter.test.ts` (6): communityIds/minSize/maxSize/dominantTypes/语义+社区组合/降级
+
+**总计**: 70 tests, 250 assertions, 0 failures, 1.74s
+
+#### 文档与 Agent 集成
+
+- 创建 `graphrag-user-guide.md`（根目录）: 面向研究人员的用户指南
+  - 核心概念（语义搜索/混合检索/智能评分/社区）
+  - 5 个使用场景
+  - 参数速查表
+  - 最佳实践 + FAQ
+- 扩展 `research.txt` Agent 系统提示:
+  - GraphRAG 工具选择决策表（smart vs basic vs atom_query）
+  - 参数指导（query/maxDepth/maxAtoms/filters/budget/template）
+  - 5 个使用模式（开放问题/主题探索/邻域/验证链/社区发现）
+  - 结果解读和展示指导
+  - 错误排查指南
+  - Memory Subagent 未来规划占位
+
+#### 计划更新
+
+- 更新 `atom-graph-prompt-plan.md`:
+  - 标记测试补全和文档集成为已完成
+  - 添加 Phase 5: Memory Subagent 长期计划
+  - 更新待完成任务列表
+- 更新 `atom-graph-prompt-progress.md`（本文档）
+
+---
+
 ## 当前状态 (graphRAG 分支)
 
 ### 代码库统计
@@ -165,29 +212,41 @@ packages/opencode/src/tool/atom-graph-prompt/
 └── types.ts          (55 行)  - 类型定义 + 社区类型
 ```
 
-**测试文件**:
+**测试文件** (70 个测试全部通过):
 
 ```
 packages/opencode/test/tool/atom-graph-prompt/
-└── community.test.ts (280 行) - 社区检测测试（待修复）
+├── community.test.ts          (339 行) -  5 tests - 社区检测基础
+├── community-advanced.test.ts (342 行) - 13 tests - 社区检测增强
+├── community-filter.test.ts   (384 行) -  6 tests - 社区过滤集成
+├── embedding.test.ts          (168 行) -  6 tests - Embedding 系统
+├── scoring.test.ts            (232 行) - 10 tests - 评分系统
+├── token-budget.test.ts       (233 行) - 13 tests - Token 预算
+├── hybrid.test.ts             (413 行) -  8 tests - 混合检索 + 图遍历
+└── builder.test.ts            (318 行) -  9 tests - Prompt 构建
 ```
 
 **文档**:
 
-- `atom-graph-prompt-usage.md` - 完整使用指南（~800 行）
-- `atom-graph-prompt-plan.md` - 开发计划
-- `atom-graph-prompt-phase2-test-design.md` - Phase 2 测试设计
-- `atom-graph-prompt-progress.md` - 本文档
+- `graphrag-user-guide.md` - 用户指南（根目录）
+- `docs/atom-graph-prompt-usage.md` - 技术使用指南（~800 行）
+- `docs/atom-graph-prompt-plan.md` - 开发计划
+- `docs/atom-graph-prompt-phase2-test-design.md` - Phase 2 测试设计
+- `docs/atom-graph-prompt-progress.md` - 本文档
+- `packages/opencode/src/agent/prompt/research.txt` - Agent GraphRAG 指导
 
 ### 功能完成度
 
-| Phase                   | 状态      | 完成度 | 分支     |
-| ----------------------- | --------- | ------ | -------- |
-| Phase 1: 图遍历         | ✅ 完成   | 100%   | graphRAG |
-| Phase 2: 智能检索       | ✅ 完成   | 100%   | graphRAG |
-| Phase 3.1: 社区检测     | ✅ 完成   | 100%   | graphRAG |
-| Phase 3.2: 社区分析增强 | 🔲 待实施 | 0%     | -        |
-| Phase 4: 高级功能       | 🔲 未开始 | 0%     | -        |
+| Phase                    | 状态    | 完成度 | 分支     |
+| ------------------------ | ------- | ------ | -------- |
+| Phase 1: 图遍历          | ✅ 完成 | 100%   | graphRAG |
+| Phase 2: 智能检索        | ✅ 完成 | 100%   | graphRAG |
+| Phase 3.1: 社区检测      | ✅ 完成 | 100%   | graphRAG |
+| Phase 3.1 测试补全       | ✅ 完成 | 100%   | graphRAG |
+| 文档与 Agent 集成        | ✅ 完成 | 100%   | graphRAG |
+| Phase 3.2: 社区分析增强  | 🔲 长期 | 0%     | -        |
+| Phase 4: 高级功能        | 🔲 长期 | 0%     | -        |
+| Phase 5: Memory Subagent | 🔲 长期 | 0%     | -        |
 
 ---
 
@@ -261,35 +320,28 @@ await agent.useTool("atom_graph_prompt_smart", {
 
 ## 待完成任务
 
-### 高优先级
+### 已完成 ✅
 
-1. **测试修复**
-   - 修复 `community.test.ts` 的数据库依赖问题
-   - 需要创建 ResearchProject 和完整的测试数据
-
-2. **实际测试**
-   - 在真实的 Atom Graph 上测试社区检测
-   - 验证社区质量和摘要准确性
+1. ~~修复 community.test.ts 的数据库依赖问题~~ ✅
+2. ~~实现 Phase 2 测试用例~~ ✅ (70 tests)
+3. ~~创建用户指南文档~~ ✅
+4. ~~扩展 agent 系统提示~~ ✅
 
 ### 中优先级
 
-3. **Phase 2 测试**
-   - 实现 33 个测试用例（参考 phase2-test-design.md）
+5. **实际测试**
+   - 在真实的 Atom Graph 上测试社区检测
+   - 验证社区质量和摘要准确性
 
-4. **功能增强**
+6. **功能增强**
    - 集成真实的 embedding API（OpenAI/HuggingFace）
-   - Phase 3.2: 社区分析增强
+   - 性能测试和优化
 
-### 低优先级
+### 长期
 
-5. **性能优化**
-   - 大规模图性能测试
-   - 并行处理支持
-
-6. **高级功能**
-   - Phase 4.1: 时序分析
-   - Phase 4.2: 推荐系统
-   - Phase 4.3: 可视化
+7. Phase 3.2: 社区分析增强
+8. Phase 4: 高级功能（时序/推荐/可视化）
+9. Phase 5: Memory Subagent
 
 ---
 
@@ -331,31 +383,30 @@ await agent.useTool("atom_graph_prompt_smart", {
 
 ### 短期（1-2 周）
 
-1. 修复 `community.test.ts` 的数据库依赖问题
-2. 在实际项目中测试 Phase 3.1 功能
-3. 收集用户反馈和改进建议
+1. 在实际项目中测试 GraphRAG 功能
+2. 收集用户反馈和改进建议
+3. 集成真实的 embedding API
 
 ### 中期（1 个月）
 
-1. 实现 Phase 2 的完整测试套件
-2. 集成真实的 embedding API
-3. 开始 Phase 3.2 开发（社区间关系分析）
+1. 性能测试和优化
+2. Phase 3.2: 社区间关系分析
 
 ### 长期（3 个月）
 
-1. 完成 Phase 3.2 社区分析增强
-2. 规划 Phase 4 高级功能
-3. 性能优化和大规模测试
+1. Phase 4: 高级功能（时序/推荐/可视化）
+2. Phase 5: Memory Subagent
 
 ---
 
 ## 提交历史
 
-| 提交      | 日期       | 说明                 |
-| --------- | ---------- | -------------------- |
-| `3329004` | 2026-04-06 | Phase 1 & 2 初始实现 |
-| `ea51fac` | 2026-04-08 | Phase 3.1 社区检测   |
-| `6184b62` | 2026-04-08 | 文档更新和进展记录   |
+| 提交      | 日期       | 说明                             |
+| --------- | ---------- | -------------------------------- |
+| `3329004` | 2026-04-06 | Phase 1 & 2 初始实现             |
+| `ea51fac` | 2026-04-08 | Phase 3.1 社区检测               |
+| `6184b62` | 2026-04-08 | 文档更新和进展记录               |
+| (pending) | 2026-04-11 | 测试补全 + 用户指南 + Agent 集成 |
 
 ---
 
@@ -363,9 +414,9 @@ await agent.useTool("atom_graph_prompt_smart", {
 
 - **开发**: zj45
 - **分支**: graphRAG
-- **时间**: 2026-04-06 至 2026-04-08
-- **代码量**: ~2,500 行（含测试和文档）
+- **时间**: 2026-04-06 至 2026-04-11
+- **代码量**: ~5,000 行（含测试和文档）
 
 ---
 
-最后更新: 2026-04-08
+最后更新: 2026-04-11

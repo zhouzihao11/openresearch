@@ -84,7 +84,37 @@ Atom Graph Prompt 是一个基于知识图谱的智能 prompt 生成工具，用
 
 ---
 
-### 🔲 Phase 3.2: 社区分析增强（待实施）
+### ✅ Phase 3.1 测试补全（已完成）
+
+**目标**: 修复已有测试并编写全覆盖的测试套件
+
+**完成内容**:
+
+- ✅ 修复 community.test.ts 数据库依赖问题（ResearchProject FK、session_id FK、唯一 ID）
+- ✅ 编写 Phase 2 测试: embedding.test.ts (6 tests)
+- ✅ 编写 Phase 2 测试: scoring.test.ts (10 tests)
+- ✅ 编写 Phase 2 测试: token-budget.test.ts (13 tests)
+- ✅ 编写 Phase 2 测试: hybrid.test.ts (8 tests)
+- ✅ 编写 Phase 3 测试: community-advanced.test.ts (13 tests)
+- ✅ 编写 Phase 3 测试: builder.test.ts (9 tests)
+- ✅ 编写 Phase 3 测试: community-filter.test.ts (6 tests)
+
+**总计**: 70 个测试用例全部通过（250 assertions，1.74s）
+
+---
+
+### ✅ 文档与 Agent 集成（已完成）
+
+**目标**: 面向用户和 Agent 的 GraphRAG 文档
+
+**完成内容**:
+
+- ✅ 创建用户指南 `graphrag-user-guide.md`（根目录）
+- ✅ 扩展 `research.txt` 添加 GraphRAG 工具选择、参数指导、使用模式
+
+---
+
+### 🔲 Phase 3.2: 社区分析增强（长期计划）
 
 **目标**: 深化社区分析能力
 
@@ -97,7 +127,7 @@ Atom Graph Prompt 是一个基于知识图谱的智能 prompt 生成工具，用
 
 ---
 
-### 🔲 Phase 4: 高级功能（未开始）
+### 🔲 Phase 4: 高级功能（长期计划）
 
 **Phase 4.1: 时序分析**
 
@@ -119,25 +149,50 @@ Atom Graph Prompt 是一个基于知识图谱的智能 prompt 生成工具，用
 
 ---
 
+### 🔲 Phase 5: Memory Subagent（长期计划）
+
+**目标**: 创建专门的 memory 子代理负责维护和操作 atom graph
+
+**计划内容**:
+
+- 🔲 **Memory Agent 定义**: 在 agent.ts 中注册 mode="subagent" 的 memory agent
+- 🔲 **Memory Agent Prompt**: 编写 memory.txt 系统提示，涵盖 CRUD、检索、分析、质量检查
+- 🔲 **Research Agent 集成**: 在 research.txt 中添加 delegation 指导
+- 🔲 **专属分析工具**: `memory_analyze` 工具（社区分析、中心节点、缺口识别）
+- 🔲 **主动建议机制**: 操作后建议相关关系、发现重复、识别矛盾
+- 🔲 **图谱健康检查**: 孤立节点检测、类型错误检查、缺失关系建议
+
+**设计要点**:
+
+- Memory agent 拥有全部 atom CRUD 工具 + graphRAG 工具
+- 通过 task tool 被 research agent 调用
+- 负责：批量创建 atoms、图谱清理、模式检测、质量保障
+- 不做研究决策，只做图谱操作
+
+---
+
 ## 待完成任务
 
-### 高优先级
+### 已完成 ✅
 
-- 🔲 编写 Phase 2 的 33 个测试用例
-- 🔲 修复 Phase 3.1 单元测试的数据库依赖问题
-- 🔲 性能测试和优化
+- ✅ 编写 Phase 2 的测试用例（70 个测试全部通过）
+- ✅ 修复 Phase 3.1 单元测试的数据库依赖问题
+- ✅ 创建用户指南文档
+- ✅ 扩展 agent 系统提示
 
 ### 中优先级
 
 - 🔲 集成真实的 embedding API（OpenAI/HuggingFace）
 - 🔲 增量更新机制
+- 🔲 在真实 Atom Graph 上测试社区检测
+- 🔲 性能测试和优化
+
+### 长期
+
 - 🔲 Phase 3.2 社区分析增强
-
-### 低优先级
-
 - 🔲 Phase 4 高级功能
+- 🔲 Phase 5 Memory Subagent
 - 🔲 可视化界面
-- 🔲 分布式缓存支持
 
 ---
 
@@ -204,10 +259,12 @@ await tool.execute({
 
 ## 文档
 
-- `atom-graph-prompt-usage.md` - 使用指南（包含 Phase 1-3.1）
-- `atom-graph-prompt-phase2-test-design.md` - Phase 2 测试设计
-- `progress.md` - 开发进展记录
+- `graphrag-user-guide.md` - 用户指南（根目录，面向研究人员）
+- `docs/atom-graph-prompt-usage.md` - 技术使用指南（包含 Phase 1-3.1）
+- `docs/atom-graph-prompt-phase2-test-design.md` - Phase 2 测试设计
+- `docs/atom-graph-prompt-progress.md` - 开发进展记录
+- `packages/opencode/src/agent/prompt/research.txt` - Agent GraphRAG 使用指导
 
 ---
 
-最后更新: 2026-04-08
+最后更新: 2026-04-11
