@@ -4,8 +4,9 @@ import { loadEmbeddingCache, getAtomEmbedding, cosineSimilarity, saveEmbeddingCa
 import { scoreAndRankAtoms, selectDiverseAtoms, type ScoringWeights, DEFAULT_WEIGHTS } from "./scoring"
 import { selectAtomsWithinBudget, adaptiveBudgetSelection, type TokenBudgetOptions } from "./token-budget"
 import { Database, eq } from "../../storage/db"
-import { AtomTable } from "../../research/research.sql"
+import { AtomTable, ResearchProjectTable } from "../../research/research.sql"
 import { Filesystem } from "../../util/filesystem"
+import { Instance } from "../../project/instance"
 import { loadCommunityCache, getCommunityAtoms } from "./community"
 
 /**
@@ -223,8 +224,20 @@ async function semanticSearch(query: string, options: SemanticSearchOptions): Pr
   const cache = await loadEmbeddingCache()
   const queryEmbedding = await getAtomEmbedding("query", query, cache)
 
-  // 2. 获取所有 atoms
-  let atoms = Database.use((db) => db.select().from(AtomTable).all())
+  // 2. 获取当前项目的 atoms
+  let atoms: (typeof AtomTable.$inferSelect)[]
+  const researchProjectId = Database.use((db) =>
+    db
+      .select({ id: ResearchProjectTable.research_project_id })
+      .from(ResearchProjectTable)
+      .where(eq(ResearchProjectTable.project_id, Instance.project.id))
+      .get(),
+  )?.id
+  atoms = researchProjectId
+    ? Database.use((db) =>
+        db.select().from(AtomTable).where(eq(AtomTable.research_project_id, researchProjectId)).all(),
+      )
+    : Database.use((db) => db.select().from(AtomTable).all())
 
   // 3. 应用类型过滤
   if (atomTypes && atomTypes.length > 0) {

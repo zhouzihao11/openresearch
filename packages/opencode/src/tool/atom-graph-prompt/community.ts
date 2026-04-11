@@ -1,8 +1,8 @@
 import path from "path"
 import Graph from "graphology"
 import louvain from "graphology-communities-louvain"
-import { Database, inArray } from "../../storage/db"
-import { AtomTable, AtomRelationTable } from "../../research/research.sql"
+import { Database, inArray, eq } from "../../storage/db"
+import { AtomTable, AtomRelationTable, ResearchProjectTable } from "../../research/research.sql"
 import { Filesystem } from "../../util/filesystem"
 import { Instance } from "../../project/instance"
 import type { AtomType, RelationType } from "./types"
@@ -98,13 +98,36 @@ export async function saveCommunityCache(cache: CommunityCache): Promise<void> {
 }
 
 /**
- * 构建 Atom Graph
+ * 获取当前项目的 research_project_id
+ */
+function getResearchProjectId(): string | undefined {
+  const projectId = Instance.project.id
+  const research = Database.use((db) =>
+    db
+      .select({ research_project_id: ResearchProjectTable.research_project_id })
+      .from(ResearchProjectTable)
+      .where(eq(ResearchProjectTable.project_id, projectId))
+      .get(),
+  )
+  return research?.research_project_id
+}
+
+/**
+ * 构建 Atom Graph（只包含当前项目的 atoms）
  */
 function buildGraph(): Graph {
   const graph = new Graph({ type: "directed" })
 
-  // 添加所有 atoms 作为节点
-  const atoms = Database.use((db) => db.select().from(AtomTable).all())
+  const researchProjectId = getResearchProjectId()
+
+  // 添加当前项目的 atoms 作为节点
+  const atoms = researchProjectId
+    ? Database.use((db) =>
+        db.select().from(AtomTable).where(eq(AtomTable.research_project_id, researchProjectId)).all(),
+      )
+    : Database.use((db) => db.select().from(AtomTable).all())
+
+  const atomIdSet = new Set(atoms.map((a) => a.atom_id))
 
   for (const atom of atoms) {
     graph.addNode(atom.atom_id, {
@@ -114,11 +137,11 @@ function buildGraph(): Graph {
     })
   }
 
-  // 添加关系作为边
+  // 添加关系作为边（只包含两端都在当前项目内的关系）
   const relations = Database.use((db) => db.select().from(AtomRelationTable).all())
 
   for (const rel of relations) {
-    if (graph.hasNode(rel.atom_id_source) && graph.hasNode(rel.atom_id_target)) {
+    if (atomIdSet.has(rel.atom_id_source) && atomIdSet.has(rel.atom_id_target)) {
       try {
         graph.addEdge(rel.atom_id_source, rel.atom_id_target, {
           type: rel.relation_type,
