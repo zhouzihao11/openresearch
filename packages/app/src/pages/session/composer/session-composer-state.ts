@@ -59,6 +59,12 @@ export function createSessionComposerState(options?: { closeMs?: number | (() =>
     return globalSync.data.session_todo[id] ?? []
   })
 
+  const workflow = createMemo(() => {
+    const id = params.id
+    if (!id) return
+    return sync.data.workflow[id] ?? globalSync.data.session_workflow[id]
+  })
+
   const [store, setStore] = createStore({
     responding: undefined as string | undefined,
     dock: todos().length > 0,
@@ -93,6 +99,12 @@ export function createSessionComposerState(options?: { closeMs?: number | (() =>
     () => todos().length > 0 && todos().every((todo) => todo.status === "completed" || todo.status === "cancelled"),
   )
 
+  const workflowDone = createMemo(() => {
+    const item = workflow()
+    if (!item) return true
+    return ["completed", "failed", "cancelled"].includes(item.instance.status)
+  })
+
   let timer: number | undefined
   let raf: number | undefined
 
@@ -113,19 +125,22 @@ export function createSessionComposerState(options?: { closeMs?: number | (() =>
 
   createEffect(
     on(
-      () => [todos().length, done()] as const,
+      () => [todos().length, done(), workflow()?.instance.status] as const,
       ([count, complete], prev) => {
         if (raf) cancelAnimationFrame(raf)
         raf = undefined
 
-        if (count === 0) {
+        const show = count > 0 || !!workflow()
+        const settled = (count === 0 || complete) && workflowDone()
+
+        if (!show) {
           if (timer) window.clearTimeout(timer)
           timer = undefined
           setStore({ dock: false, closing: false, opening: false })
           return
         }
 
-        if (!complete) {
+        if (!settled) {
           if (timer) window.clearTimeout(timer)
           timer = undefined
           const hidden = !store.dock || store.closing
@@ -142,7 +157,7 @@ export function createSessionComposerState(options?: { closeMs?: number | (() =>
           return
         }
 
-        if (prev && prev[1]) {
+        if (prev && prev[1] && workflowDone()) {
           if (store.closing && !timer) scheduleClose()
           return
         }
@@ -170,6 +185,7 @@ export function createSessionComposerState(options?: { closeMs?: number | (() =>
     permissionResponding,
     decide,
     todos,
+    workflow,
     dock: () => store.dock,
     closing: () => store.closing,
     opening: () => store.opening,

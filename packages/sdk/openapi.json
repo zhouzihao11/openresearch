@@ -2353,6 +2353,83 @@
         ]
       }
     },
+    "/session/{sessionID}/workflow": {
+      "get": {
+        "operationId": "session.workflow",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workspace",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "sessionID",
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "description": "Session ID"
+          }
+        ],
+        "summary": "Get session workflow",
+        "description": "Retrieve the latest workflow state for a session.",
+        "responses": {
+          "200": {
+            "description": "Workflow state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/WorkflowMetadata"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.session.workflow({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/session/{sessionID}/init": {
       "post": {
         "operationId": "session.init",
@@ -5896,31 +5973,70 @@
                                   "remote_server_config": {
                                     "anyOf": [
                                       {
-                                        "type": "object",
-                                        "properties": {
-                                          "address": {
-                                            "type": "string"
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "mode": {
+                                                "type": "string",
+                                                "const": "direct"
+                                              },
+                                              "address": {
+                                                "type": "string"
+                                              },
+                                              "port": {
+                                                "type": "number"
+                                              },
+                                              "user": {
+                                                "type": "string"
+                                              },
+                                              "password": {
+                                                "type": "string"
+                                              },
+                                              "resource_root": {
+                                                "type": "string"
+                                              },
+                                              "wandb_api_key": {
+                                                "type": "string"
+                                              },
+                                              "wandb_project_name": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["mode", "address", "port", "user"]
                                           },
-                                          "port": {
-                                            "type": "number"
-                                          },
-                                          "user": {
-                                            "type": "string"
-                                          },
-                                          "password": {
-                                            "type": "string"
-                                          },
-                                          "resource_root": {
-                                            "type": "string"
-                                          },
-                                          "wandb_api_key": {
-                                            "type": "string"
-                                          },
-                                          "wandb_project_name": {
-                                            "type": "string"
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "mode": {
+                                                "type": "string",
+                                                "const": "ssh_config"
+                                              },
+                                              "host_alias": {
+                                                "type": "string"
+                                              },
+                                              "ssh_config_path": {
+                                                "type": "string"
+                                              },
+                                              "user": {
+                                                "type": "string"
+                                              },
+                                              "password": {
+                                                "type": "string"
+                                              },
+                                              "resource_root": {
+                                                "type": "string"
+                                              },
+                                              "wandb_api_key": {
+                                                "type": "string"
+                                              },
+                                              "wandb_project_name": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["mode", "host_alias"]
                                           }
-                                        },
-                                        "required": ["address", "port", "user", "password"]
+                                        ]
                                       },
                                       {
                                         "type": "null"
@@ -6805,7 +6921,7 @@
             }
           },
           "404": {
-            "description": "Experiment, atom, or article not found",
+            "description": "Experiment not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -6824,50 +6940,8 @@
               }
             }
           },
-          "409": {
-            "description": "Another experiment is already running on the same article",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ready": {
-                      "type": "boolean",
-                      "const": false
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "conflicts": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "exp_id": {
-                            "type": "string"
-                          },
-                          "exp_session_id": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ]
-                          }
-                        },
-                        "required": ["exp_id", "exp_session_id"]
-                      }
-                    }
-                  },
-                  "required": ["ready", "message", "conflicts"]
-                }
-              }
-            }
-          },
           "500": {
-            "description": "Git or branch operation failed",
+            "description": "Worktree directory does not exist",
             "content": {
               "application/json": {
                 "schema": {
@@ -7026,31 +7100,70 @@
                         "remote_server_config": {
                           "anyOf": [
                             {
-                              "type": "object",
-                              "properties": {
-                                "address": {
-                                  "type": "string"
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "mode": {
+                                      "type": "string",
+                                      "const": "direct"
+                                    },
+                                    "address": {
+                                      "type": "string"
+                                    },
+                                    "port": {
+                                      "type": "number"
+                                    },
+                                    "user": {
+                                      "type": "string"
+                                    },
+                                    "password": {
+                                      "type": "string"
+                                    },
+                                    "resource_root": {
+                                      "type": "string"
+                                    },
+                                    "wandb_api_key": {
+                                      "type": "string"
+                                    },
+                                    "wandb_project_name": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": ["mode", "address", "port", "user"]
                                 },
-                                "port": {
-                                  "type": "number"
-                                },
-                                "user": {
-                                  "type": "string"
-                                },
-                                "password": {
-                                  "type": "string"
-                                },
-                                "resource_root": {
-                                  "type": "string"
-                                },
-                                "wandb_api_key": {
-                                  "type": "string"
-                                },
-                                "wandb_project_name": {
-                                  "type": "string"
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "mode": {
+                                      "type": "string",
+                                      "const": "ssh_config"
+                                    },
+                                    "host_alias": {
+                                      "type": "string"
+                                    },
+                                    "ssh_config_path": {
+                                      "type": "string"
+                                    },
+                                    "user": {
+                                      "type": "string"
+                                    },
+                                    "password": {
+                                      "type": "string"
+                                    },
+                                    "resource_root": {
+                                      "type": "string"
+                                    },
+                                    "wandb_api_key": {
+                                      "type": "string"
+                                    },
+                                    "wandb_project_name": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": ["mode", "host_alias"]
                                 }
-                              },
-                              "required": ["address", "port", "user", "password"]
+                              ]
                             },
                             {
                               "type": "null"
@@ -7587,31 +7700,70 @@
                         "type": "string"
                       },
                       "config": {
-                        "type": "object",
-                        "properties": {
-                          "address": {
-                            "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "mode": {
+                                "type": "string",
+                                "const": "direct"
+                              },
+                              "address": {
+                                "type": "string"
+                              },
+                              "port": {
+                                "type": "number"
+                              },
+                              "user": {
+                                "type": "string"
+                              },
+                              "password": {
+                                "type": "string"
+                              },
+                              "resource_root": {
+                                "type": "string"
+                              },
+                              "wandb_api_key": {
+                                "type": "string"
+                              },
+                              "wandb_project_name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["mode", "address", "port", "user"]
                           },
-                          "port": {
-                            "type": "number"
-                          },
-                          "user": {
-                            "type": "string"
-                          },
-                          "password": {
-                            "type": "string"
-                          },
-                          "resource_root": {
-                            "type": "string"
-                          },
-                          "wandb_api_key": {
-                            "type": "string"
-                          },
-                          "wandb_project_name": {
-                            "type": "string"
+                          {
+                            "type": "object",
+                            "properties": {
+                              "mode": {
+                                "type": "string",
+                                "const": "ssh_config"
+                              },
+                              "host_alias": {
+                                "type": "string"
+                              },
+                              "ssh_config_path": {
+                                "type": "string"
+                              },
+                              "user": {
+                                "type": "string"
+                              },
+                              "password": {
+                                "type": "string"
+                              },
+                              "resource_root": {
+                                "type": "string"
+                              },
+                              "wandb_api_key": {
+                                "type": "string"
+                              },
+                              "wandb_project_name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["mode", "host_alias"]
                           }
-                        },
-                        "required": ["address", "port", "user", "password"]
+                        ]
                       },
                       "time_created": {
                         "type": "number"
@@ -7665,31 +7817,70 @@
                       "type": "string"
                     },
                     "config": {
-                      "type": "object",
-                      "properties": {
-                        "address": {
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "direct"
+                            },
+                            "address": {
+                              "type": "string"
+                            },
+                            "port": {
+                              "type": "number"
+                            },
+                            "user": {
+                              "type": "string"
+                            },
+                            "password": {
+                              "type": "string"
+                            },
+                            "resource_root": {
+                              "type": "string"
+                            },
+                            "wandb_api_key": {
+                              "type": "string"
+                            },
+                            "wandb_project_name": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["mode", "address", "port", "user"]
                         },
-                        "port": {
-                          "type": "number"
-                        },
-                        "user": {
-                          "type": "string"
-                        },
-                        "password": {
-                          "type": "string"
-                        },
-                        "resource_root": {
-                          "type": "string"
-                        },
-                        "wandb_api_key": {
-                          "type": "string"
-                        },
-                        "wandb_project_name": {
-                          "type": "string"
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "ssh_config"
+                            },
+                            "host_alias": {
+                              "type": "string"
+                            },
+                            "ssh_config_path": {
+                              "type": "string"
+                            },
+                            "user": {
+                              "type": "string"
+                            },
+                            "password": {
+                              "type": "string"
+                            },
+                            "resource_root": {
+                              "type": "string"
+                            },
+                            "wandb_api_key": {
+                              "type": "string"
+                            },
+                            "wandb_project_name": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["mode", "host_alias"]
                         }
-                      },
-                      "required": ["address", "port", "user", "password"]
+                      ]
                     }
                   },
                   "required": ["id", "config"]
@@ -7705,31 +7896,97 @@
                 "type": "object",
                 "properties": {
                   "config": {
-                    "type": "object",
-                    "properties": {
-                      "address": {
-                        "type": "string"
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "const": "direct"
+                          },
+                          "address": {
+                            "type": "string"
+                          },
+                          "port": {
+                            "type": "number"
+                          },
+                          "user": {
+                            "type": "string"
+                          },
+                          "password": {
+                            "type": "string"
+                          },
+                          "resource_root": {
+                            "type": "string"
+                          },
+                          "wandb_api_key": {
+                            "type": "string"
+                          },
+                          "wandb_project_name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["mode", "address", "port", "user"]
                       },
-                      "port": {
-                        "type": "number"
+                      {
+                        "type": "object",
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "const": "ssh_config"
+                          },
+                          "host_alias": {
+                            "type": "string"
+                          },
+                          "ssh_config_path": {
+                            "type": "string"
+                          },
+                          "user": {
+                            "type": "string"
+                          },
+                          "password": {
+                            "type": "string"
+                          },
+                          "resource_root": {
+                            "type": "string"
+                          },
+                          "wandb_api_key": {
+                            "type": "string"
+                          },
+                          "wandb_project_name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["mode", "host_alias"]
                       },
-                      "user": {
-                        "type": "string"
-                      },
-                      "password": {
-                        "type": "string"
-                      },
-                      "resource_root": {
-                        "type": "string"
-                      },
-                      "wandb_api_key": {
-                        "type": "string"
-                      },
-                      "wandb_project_name": {
-                        "type": "string"
+                      {
+                        "type": "object",
+                        "properties": {
+                          "address": {
+                            "type": "string"
+                          },
+                          "port": {
+                            "type": "number"
+                          },
+                          "user": {
+                            "type": "string"
+                          },
+                          "password": {
+                            "type": "string"
+                          },
+                          "resource_root": {
+                            "type": "string"
+                          },
+                          "wandb_api_key": {
+                            "type": "string"
+                          },
+                          "wandb_project_name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["address", "port", "user"]
                       }
-                    },
-                    "required": ["address", "port", "user", "password"]
+                    ]
                   }
                 },
                 "required": ["config"]
@@ -7741,6 +7998,158 @@
           {
             "lang": "js",
             "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.research.server.create({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/research/server/import-ssh-config": {
+      "post": {
+        "operationId": "research.server.importSshConfig",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workspace",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "summary": "Import remote servers from SSH config",
+        "responses": {
+          "200": {
+            "description": "Imported remote servers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "imported": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "config": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "mode": {
+                                    "type": "string",
+                                    "const": "direct"
+                                  },
+                                  "address": {
+                                    "type": "string"
+                                  },
+                                  "port": {
+                                    "type": "number"
+                                  },
+                                  "user": {
+                                    "type": "string"
+                                  },
+                                  "password": {
+                                    "type": "string"
+                                  },
+                                  "resource_root": {
+                                    "type": "string"
+                                  },
+                                  "wandb_api_key": {
+                                    "type": "string"
+                                  },
+                                  "wandb_project_name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["mode", "address", "port", "user"]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "mode": {
+                                    "type": "string",
+                                    "const": "ssh_config"
+                                  },
+                                  "host_alias": {
+                                    "type": "string"
+                                  },
+                                  "ssh_config_path": {
+                                    "type": "string"
+                                  },
+                                  "user": {
+                                    "type": "string"
+                                  },
+                                  "password": {
+                                    "type": "string"
+                                  },
+                                  "resource_root": {
+                                    "type": "string"
+                                  },
+                                  "wandb_api_key": {
+                                    "type": "string"
+                                  },
+                                  "wandb_project_name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["mode", "host_alias"]
+                              }
+                            ]
+                          }
+                        },
+                        "required": ["id", "config"]
+                      }
+                    },
+                    "skipped": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": ["imported", "skipped"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  }
+                },
+                "required": ["path"]
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.research.server.importSshConfig({\n  ...\n})"
           }
         ]
       }
@@ -8442,31 +8851,70 @@
                     "remote_server_config": {
                       "anyOf": [
                         {
-                          "type": "object",
-                          "properties": {
-                            "address": {
-                              "type": "string"
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "mode": {
+                                  "type": "string",
+                                  "const": "direct"
+                                },
+                                "address": {
+                                  "type": "string"
+                                },
+                                "port": {
+                                  "type": "number"
+                                },
+                                "user": {
+                                  "type": "string"
+                                },
+                                "password": {
+                                  "type": "string"
+                                },
+                                "resource_root": {
+                                  "type": "string"
+                                },
+                                "wandb_api_key": {
+                                  "type": "string"
+                                },
+                                "wandb_project_name": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["mode", "address", "port", "user"]
                             },
-                            "port": {
-                              "type": "number"
-                            },
-                            "user": {
-                              "type": "string"
-                            },
-                            "password": {
-                              "type": "string"
-                            },
-                            "resource_root": {
-                              "type": "string"
-                            },
-                            "wandb_api_key": {
-                              "type": "string"
-                            },
-                            "wandb_project_name": {
-                              "type": "string"
+                            {
+                              "type": "object",
+                              "properties": {
+                                "mode": {
+                                  "type": "string",
+                                  "const": "ssh_config"
+                                },
+                                "host_alias": {
+                                  "type": "string"
+                                },
+                                "ssh_config_path": {
+                                  "type": "string"
+                                },
+                                "user": {
+                                  "type": "string"
+                                },
+                                "password": {
+                                  "type": "string"
+                                },
+                                "resource_root": {
+                                  "type": "string"
+                                },
+                                "wandb_api_key": {
+                                  "type": "string"
+                                },
+                                "wandb_project_name": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["mode", "host_alias"]
                             }
-                          },
-                          "required": ["address", "port", "user", "password"]
+                          ]
                         },
                         {
                           "type": "null"
@@ -13505,6 +13953,224 @@
         },
         "required": ["type", "properties"]
       },
+      "WorkflowStepPolicy": {
+        "type": "object",
+        "properties": {
+          "can_next": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "can_wait_interaction": {
+            "default": false,
+            "type": "boolean"
+          },
+          "can_edit_future": {
+            "default": false,
+            "type": "boolean"
+          },
+          "allowed_edit_ops": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["insert", "delete"]
+            }
+          }
+        }
+      },
+      "WorkflowMetadata": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["start", "next", "edit", "wait_interaction", "fail", "inspect"]
+          },
+          "instance": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "template_id": {
+                "type": "string"
+              },
+              "flow_id": {
+                "type": "string"
+              },
+              "flow_title": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["running", "waiting_interaction", "completed", "failed", "cancelled"]
+              },
+              "current_index": {
+                "type": "number"
+              },
+              "context": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "current_step": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string"
+                  },
+                  "prompt": {
+                    "type": "string"
+                  },
+                  "policy": {
+                    "$ref": "#/components/schemas/WorkflowStepPolicy"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": ["pending", "active", "done", "waiting_interaction", "skipped"]
+                  },
+                  "result": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  },
+                  "interaction": {
+                    "type": "object",
+                    "properties": {
+                      "reason": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "last_user_message": {
+                        "type": "string"
+                      },
+                      "wait_after_user_message_id": {
+                        "type": "string"
+                      },
+                      "resumed_user_message_id": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "required": ["id", "kind", "title", "summary", "prompt", "policy", "status"]
+              },
+              "steps": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["pending", "active", "done", "waiting_interaction", "skipped"]
+                    },
+                    "result": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": ["id", "kind", "title", "summary", "status"]
+                }
+              }
+            },
+            "required": [
+              "id",
+              "template_id",
+              "flow_id",
+              "flow_title",
+              "title",
+              "status",
+              "current_index",
+              "context",
+              "steps"
+            ]
+          },
+          "diff": {
+            "type": "object",
+            "properties": {
+              "inserted": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["id", "title"]
+                }
+              },
+              "deleted": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "required": ["action", "instance"]
+      },
+      "Event.workflow.updated": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "workflow.updated"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "sessionID": {
+                "type": "string"
+              },
+              "workflow": {
+                "$ref": "#/components/schemas/WorkflowMetadata"
+              }
+            },
+            "required": ["sessionID", "workflow"]
+          }
+        },
+        "required": ["type", "properties"]
+      },
       "Event.tui.prompt.append": {
         "type": "object",
         "properties": {
@@ -14231,6 +14897,9 @@
           },
           {
             "$ref": "#/components/schemas/Event.research.atoms.updated"
+          },
+          {
+            "$ref": "#/components/schemas/Event.workflow.updated"
           },
           {
             "$ref": "#/components/schemas/Event.tui.prompt.append"

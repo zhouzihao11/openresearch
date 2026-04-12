@@ -728,6 +728,73 @@ export type EventResearchAtomsUpdated = {
   }
 }
 
+export type WorkflowStepPolicy = {
+  can_next?: Array<string>
+  can_wait_interaction?: boolean
+  can_edit_future?: boolean
+  allowed_edit_ops?: Array<"insert" | "delete">
+}
+
+export type WorkflowMetadata = {
+  action: "start" | "next" | "edit" | "wait_interaction" | "fail" | "inspect"
+  instance: {
+    id: string
+    template_id: string
+    flow_id: string
+    flow_title: string
+    title: string
+    status: "running" | "waiting_interaction" | "completed" | "failed" | "cancelled"
+    current_index: number
+    context: {
+      [key: string]: unknown
+    }
+    current_step?: {
+      id: string
+      kind: string
+      title: string
+      summary: string
+      prompt: string
+      policy: WorkflowStepPolicy
+      status: "pending" | "active" | "done" | "waiting_interaction" | "skipped"
+      result?: {
+        [key: string]: unknown
+      }
+      interaction?: {
+        reason?: string
+        message?: string
+        last_user_message?: string
+        wait_after_user_message_id?: string
+        resumed_user_message_id?: string
+      }
+    }
+    steps: Array<{
+      id: string
+      kind: string
+      title: string
+      summary: string
+      status: "pending" | "active" | "done" | "waiting_interaction" | "skipped"
+      result?: {
+        [key: string]: unknown
+      }
+    }>
+  }
+  diff?: {
+    inserted?: Array<{
+      id: string
+      title: string
+    }>
+    deleted?: Array<string>
+  }
+}
+
+export type EventWorkflowUpdated = {
+  type: "workflow.updated"
+  properties: {
+    sessionID: string
+    workflow: WorkflowMetadata
+  }
+}
+
 export type EventTuiPromptAppend = {
   type: "tui.prompt.append"
   properties: {
@@ -996,6 +1063,7 @@ export type Event =
   | EventFileWatcherUpdated
   | EventTodoUpdated
   | EventResearchAtomsUpdated
+  | EventWorkflowUpdated
   | EventTuiPromptAppend
   | EventTuiCommandExecute
   | EventTuiToastShow
@@ -3055,6 +3123,43 @@ export type SessionTodoResponses = {
 
 export type SessionTodoResponse = SessionTodoResponses[keyof SessionTodoResponses]
 
+export type SessionWorkflowData = {
+  body?: never
+  path: {
+    /**
+     * Session ID
+     */
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/session/{sessionID}/workflow"
+}
+
+export type SessionWorkflowErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type SessionWorkflowError = SessionWorkflowErrors[keyof SessionWorkflowErrors]
+
+export type SessionWorkflowResponses = {
+  /**
+   * Workflow state
+   */
+  200: WorkflowMetadata | null
+}
+
+export type SessionWorkflowResponse = SessionWorkflowResponses[keyof SessionWorkflowResponses]
+
 export type SessionInitData = {
   body?: {
     modelID: string
@@ -4417,15 +4522,28 @@ export type ResearchSessionAtomGetResponses = {
         exp_result_summary_path: string | null
         exp_plan_path: string | null
         remote_server_id: string | null
-        remote_server_config: {
-          address: string
-          port: number
-          user: string
-          password: string
-          resource_root?: string
-          wandb_api_key?: string
-          wandb_project_name?: string
-        } | null
+        remote_server_config:
+          | {
+              mode: "direct"
+              address: string
+              port: number
+              user: string
+              password?: string
+              resource_root?: string
+              wandb_api_key?: string
+              wandb_project_name?: string
+            }
+          | {
+              mode: "ssh_config"
+              host_alias: string
+              ssh_config_path?: string
+              user?: string
+              password?: string
+              resource_root?: string
+              wandb_api_key?: string
+              wandb_project_name?: string
+            }
+          | null
         code_path: string
         status: "pending" | "running" | "done" | "idle" | "failed"
         started_at: number | null
@@ -4752,25 +4870,14 @@ export type ResearchExperimentReadyData = {
 
 export type ResearchExperimentReadyErrors = {
   /**
-   * Experiment, atom, or article not found
+   * Experiment not found
    */
   404: {
     ready: false
     message: string
   }
   /**
-   * Another experiment is already running on the same article
-   */
-  409: {
-    ready: false
-    message: string
-    conflicts: Array<{
-      exp_id: string
-      exp_session_id: string | null
-    }>
-  }
-  /**
-   * Git or branch operation failed
+   * Worktree directory does not exist
    */
   500: {
     ready: false
@@ -4833,15 +4940,28 @@ export type ResearchExperimentBySessionResponses = {
     exp_result_summary_path: string | null
     exp_plan_path: string | null
     remote_server_id: string | null
-    remote_server_config: {
-      address: string
-      port: number
-      user: string
-      password: string
-      resource_root?: string
-      wandb_api_key?: string
-      wandb_project_name?: string
-    } | null
+    remote_server_config:
+      | {
+          mode: "direct"
+          address: string
+          port: number
+          user: string
+          password?: string
+          resource_root?: string
+          wandb_api_key?: string
+          wandb_project_name?: string
+        }
+      | {
+          mode: "ssh_config"
+          host_alias: string
+          ssh_config_path?: string
+          user?: string
+          password?: string
+          resource_root?: string
+          wandb_api_key?: string
+          wandb_project_name?: string
+        }
+      | null
     code_path: string
     status: "pending" | "running" | "done" | "idle" | "failed"
     started_at: number | null
@@ -4984,15 +5104,27 @@ export type ResearchServerListResponses = {
    */
   200: Array<{
     id: string
-    config: {
-      address: string
-      port: number
-      user: string
-      password: string
-      resource_root?: string
-      wandb_api_key?: string
-      wandb_project_name?: string
-    }
+    config:
+      | {
+          mode: "direct"
+          address: string
+          port: number
+          user: string
+          password?: string
+          resource_root?: string
+          wandb_api_key?: string
+          wandb_project_name?: string
+        }
+      | {
+          mode: "ssh_config"
+          host_alias: string
+          ssh_config_path?: string
+          user?: string
+          password?: string
+          resource_root?: string
+          wandb_api_key?: string
+          wandb_project_name?: string
+        }
     time_created: number
     time_updated: number
   }>
@@ -5002,15 +5134,36 @@ export type ResearchServerListResponse = ResearchServerListResponses[keyof Resea
 
 export type ResearchServerCreateData = {
   body?: {
-    config: {
-      address: string
-      port: number
-      user: string
-      password: string
-      resource_root?: string
-      wandb_api_key?: string
-      wandb_project_name?: string
-    }
+    config:
+      | {
+          mode: "direct"
+          address: string
+          port: number
+          user: string
+          password?: string
+          resource_root?: string
+          wandb_api_key?: string
+          wandb_project_name?: string
+        }
+      | {
+          mode: "ssh_config"
+          host_alias: string
+          ssh_config_path?: string
+          user?: string
+          password?: string
+          resource_root?: string
+          wandb_api_key?: string
+          wandb_project_name?: string
+        }
+      | {
+          address: string
+          port: number
+          user: string
+          password?: string
+          resource_root?: string
+          wandb_api_key?: string
+          wandb_project_name?: string
+        }
   }
   path?: never
   query?: {
@@ -5026,19 +5179,89 @@ export type ResearchServerCreateResponses = {
    */
   200: {
     id: string
-    config: {
-      address: string
-      port: number
-      user: string
-      password: string
-      resource_root?: string
-      wandb_api_key?: string
-      wandb_project_name?: string
-    }
+    config:
+      | {
+          mode: "direct"
+          address: string
+          port: number
+          user: string
+          password?: string
+          resource_root?: string
+          wandb_api_key?: string
+          wandb_project_name?: string
+        }
+      | {
+          mode: "ssh_config"
+          host_alias: string
+          ssh_config_path?: string
+          user?: string
+          password?: string
+          resource_root?: string
+          wandb_api_key?: string
+          wandb_project_name?: string
+        }
   }
 }
 
 export type ResearchServerCreateResponse = ResearchServerCreateResponses[keyof ResearchServerCreateResponses]
+
+export type ResearchServerImportSshConfigData = {
+  body?: {
+    path: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/research/server/import-ssh-config"
+}
+
+export type ResearchServerImportSshConfigErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ResearchServerImportSshConfigError =
+  ResearchServerImportSshConfigErrors[keyof ResearchServerImportSshConfigErrors]
+
+export type ResearchServerImportSshConfigResponses = {
+  /**
+   * Imported remote servers
+   */
+  200: {
+    imported: Array<{
+      id: string
+      config:
+        | {
+            mode: "direct"
+            address: string
+            port: number
+            user: string
+            password?: string
+            resource_root?: string
+            wandb_api_key?: string
+            wandb_project_name?: string
+          }
+        | {
+            mode: "ssh_config"
+            host_alias: string
+            ssh_config_path?: string
+            user?: string
+            password?: string
+            resource_root?: string
+            wandb_api_key?: string
+            wandb_project_name?: string
+          }
+    }>
+    skipped: Array<string>
+  }
+}
+
+export type ResearchServerImportSshConfigResponse =
+  ResearchServerImportSshConfigResponses[keyof ResearchServerImportSshConfigResponses]
 
 export type ResearchServerDeleteData = {
   body?: never
@@ -5302,15 +5525,28 @@ export type ResearchExperimentUpdateResponses = {
     exp_result_summary_path: string | null
     exp_plan_path: string | null
     remote_server_id: string | null
-    remote_server_config: {
-      address: string
-      port: number
-      user: string
-      password: string
-      resource_root?: string
-      wandb_api_key?: string
-      wandb_project_name?: string
-    } | null
+    remote_server_config:
+      | {
+          mode: "direct"
+          address: string
+          port: number
+          user: string
+          password?: string
+          resource_root?: string
+          wandb_api_key?: string
+          wandb_project_name?: string
+        }
+      | {
+          mode: "ssh_config"
+          host_alias: string
+          ssh_config_path?: string
+          user?: string
+          password?: string
+          resource_root?: string
+          wandb_api_key?: string
+          wandb_project_name?: string
+        }
+      | null
     code_path: string
     status: "pending" | "running" | "done" | "idle" | "failed"
     started_at: number | null
@@ -5322,6 +5558,74 @@ export type ResearchExperimentUpdateResponses = {
 
 export type ResearchExperimentUpdateResponse =
   ResearchExperimentUpdateResponses[keyof ResearchExperimentUpdateResponses]
+
+export type ResearchProjectExportData = {
+  body?: never
+  path: {
+    researchProjectId: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/research/project/{researchProjectId}/export"
+}
+
+export type ResearchProjectExportErrors = {
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type ResearchProjectExportError = ResearchProjectExportErrors[keyof ResearchProjectExportErrors]
+
+export type ResearchProjectExportResponses = {
+  /**
+   * Export successful
+   */
+  200: {
+    zip_path: string
+    zip_name: string
+    size: number
+  }
+}
+
+export type ResearchProjectExportResponse = ResearchProjectExportResponses[keyof ResearchProjectExportResponses]
+
+export type ResearchProjectImportData = {
+  body?: {
+    zipPath: string
+    targetDirectory: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/research/import-project"
+}
+
+export type ResearchProjectImportErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ResearchProjectImportError = ResearchProjectImportErrors[keyof ResearchProjectImportErrors]
+
+export type ResearchProjectImportResponses = {
+  /**
+   * Import successful
+   */
+  200: {
+    project_id: string
+    research_project_id: string
+  }
+}
+
+export type ResearchProjectImportResponse = ResearchProjectImportResponses[keyof ResearchProjectImportResponses]
 
 export type PermissionReplyData = {
   body?: {

@@ -381,4 +381,18 @@ describe("Project.remove", () => {
     expect(result).toBe(true)
     expect(await Filesystem.exists(tmp.path)).toBe(false)
   })
+
+  test("preserves the local project directory by default", async () => {
+    await using tmp = await tmpdir({ git: true })
+
+    const session = await Instance.provide({
+      directory: tmp.path,
+      fn: async () => Session.create({ title: "preserve-project-folder" }),
+    })
+
+    const result = await Project.remove({ projectID: session.projectID, removeLocal: false })
+    expect(result).toBe(true)
+    expect(await Filesystem.exists(tmp.path)).toBe(true)
+    expect(Project.get(session.projectID)).toBeUndefined()
+  })
 })

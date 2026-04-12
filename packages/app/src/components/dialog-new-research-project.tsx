@@ -58,7 +58,7 @@ export function DialogPathPicker(props: PathPickerProps) {
   const [isValidating, setIsValidating] = createSignal(false)
 
   const home = createMemo(() => props.startDir?.() || sync.data.path.home || sync.data.path.directory || "/")
-  const [cwd, setCwd] = createSignal(home())
+  const [cwd, setCwd] = createSignal(trimTrailing(home()))
 
   const goUp = () => {
     const cur = cwd()

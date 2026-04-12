@@ -1,4 +1,4 @@
-import { createSignal, For, Match, onMount, Show, Switch } from "solid-js"
+import { createEffect, createSignal, For, Match, onMount, Show, Switch } from "solid-js"
 import { useSDK } from "@/context/sdk"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { DialogPathPicker } from "@/components/dialog-new-research-project"
@@ -68,7 +68,8 @@ export function CodesTab(props: { researchProjectId: string }) {
     return map
   }
 
-  onMount(() => {
+  createEffect(() => {
+    const projectId = props.researchProjectId
     fetchCodes()
     fetchArticles()
   })

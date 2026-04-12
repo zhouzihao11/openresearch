@@ -28,7 +28,7 @@ import fs from "fs"
 import { rm } from "fs/promises"
 import { git } from "@/util/git"
 import { Research } from "@/research/research.ts"
-import { ensureGitignore, GIT_ENV, gitErr } from "@/session/experiment-guard"
+import { ensureGitignore, GIT_ENV, gitErr, ensureRepoInitialized } from "@/session/experiment-guard"
 import { Instance } from "@/project/instance"
 import { Snapshot } from "@/snapshot"
 import { computeExperimentDiff } from "@/util/git-diff"
@@ -36,6 +36,16 @@ import { checkExperimentReadyByExpId } from "@/session/experiment-guard"
 import { forceRefreshWatch } from "@/research/experiment-watcher"
 import { forceRefreshLocalDownload } from "@/research/experiment-local-download-watcher"
 import { ExperimentExecutionWatch } from "@/research/experiment-execution-watch"
+import { ZipWriter, ZipReader, BlobReader, BlobWriter } from "@zip.js/zip.js"
+// @ts-ignore - unzipper has no type declarations
+import unzipper from "unzipper"
+import {
+  normalizeRemoteServerConfig,
+  type RemoteServerConfig,
+  RemoteServerConfigSchema,
+  RemoteServerInputSchema,
+} from "@/research/remote-server"
+import { parseSshConfig } from "@/research/ssh-config"
 
 const createSchema = z.object({
   name: z.string().min(1, "name required"),
@@ -73,16 +83,6 @@ const atomSchema = z.object({
   time_updated: z.number(),
 })
 
-const remoteServerConfigSchema = z.object({
-  address: z.string(),
-  port: z.number(),
-  user: z.string(),
-  password: z.string(),
-  resource_root: z.string().optional(),
-  wandb_api_key: z.string().optional(),
-  wandb_project_name: z.string().optional(),
-})
-
 const experimentSchema = z.object({
   exp_id: z.string(),
   research_project_id: z.string(),
@@ -95,7 +95,7 @@ const experimentSchema = z.object({
   exp_result_summary_path: z.string().nullable(),
   exp_plan_path: z.string().nullable(),
   remote_server_id: z.string().nullable(),
-  remote_server_config: remoteServerConfigSchema.nullable(),
+  remote_server_config: RemoteServerConfigSchema.nullable(),
   code_path: z.string(),
   status: z.enum(["pending", "running", "done", "idle", "failed"]),
   started_at: z.number().nullable(),
@@ -162,8 +162,6 @@ const codeSchema = z.object({
 const VALID_CODE_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/
 const GITHUB_URL_RE = /^https?:\/\/(www\.)?github\.com\/.+\/.+/
 
-type RemoteServerConfig = z.infer<typeof remoteServerConfigSchema>
-
 function resolveRemoteServerConfig(remoteServerId: string | null): RemoteServerConfig | null {
   if (!remoteServerId) return null
   const server = Database.use((db) =>
@@ -171,7 +169,7 @@ function resolveRemoteServerConfig(remoteServerId: string | null): RemoteServerC
   )
   if (!server) return null
   try {
-    return JSON.parse(server.config) as RemoteServerConfig
+    return normalizeRemoteServerConfig(JSON.parse(server.config))
   } catch {
     return null
   }
@@ -276,9 +274,56 @@ export const ResearchRoutes = new Hono()
     }),
     async (c) => {
       const projectId = c.req.param("projectId")
-      const row = Database.use((db) =>
+      let row = Database.use((db) =>
         db.select().from(ResearchProjectTable).where(eq(ResearchProjectTable.project_id, projectId)).get(),
       )
+
+      // If not found in database, try to recover from memo file
+      if (!row) {
+        try {
+          let project
+          try {
+            project = await Project.get(projectId)
+          } catch (err) {
+            project = undefined
+          }
+
+          if (project) {
+            const memoPath = path.join(project.worktree, ".opencode-research.json")
+            if (await Filesystem.exists(memoPath)) {
+              const memo = await Filesystem.readJson<{ research_project_id: string; project_id: string }>(memoPath)
+
+              // Check if this research project exists in database
+              const existingResearch = Database.use((db) =>
+                db
+                  .select()
+                  .from(ResearchProjectTable)
+                  .where(eq(ResearchProjectTable.research_project_id, memo.research_project_id))
+                  .get(),
+              )
+
+              if (existingResearch) {
+                // Update the project_id to current one
+                Database.use((db) =>
+                  db
+                    .update(ResearchProjectTable)
+                    .set({ project_id: projectId, time_updated: Date.now() })
+                    .where(eq(ResearchProjectTable.research_project_id, memo.research_project_id))
+                    .run(),
+                )
+
+                // Fetch the updated row
+                row = Database.use((db) =>
+                  db.select().from(ResearchProjectTable).where(eq(ResearchProjectTable.project_id, projectId)).get(),
+                )
+              }
+            }
+          }
+        } catch (err) {
+          // Silently fail recovery attempt
+        }
+      }
+
       if (!row) {
         return c.json({ success: false, message: "no research project for this project" }, 404)
       }
@@ -725,17 +770,11 @@ export const ResearchRoutes = new Hono()
         // Delete experiment results directory
         const expDir = path.join(Instance.directory, "exp_results", exp.exp_id)
         await rm(expDir, { recursive: true, force: true }).catch(() => {})
-        // Delete experiment git branch
+        // Remove experiment worktree and branch
         if (exp.exp_branch_name) {
-          const codePath = exp.code_path
-          const head = await git(["rev-parse", "--abbrev-ref", "HEAD"], { cwd: codePath }).catch(() => null)
-          const currentBranch = head?.stdout?.toString().trim()
-          if (currentBranch === exp.exp_branch_name) {
-            const baseline = exp.baseline_branch_name || "master"
-            await git(["checkout", "-f", baseline], { cwd: codePath }).catch(() => {})
-            await git(["clean", "-fd"], { cwd: codePath }).catch(() => {})
-          }
-          await git(["branch", "-D", exp.exp_branch_name], { cwd: codePath }).catch(() => {})
+          const baseRepo = path.resolve(exp.code_path, "../..")
+          await git(["worktree", "remove", exp.code_path, "--force"], { cwd: baseRepo }).catch(() => {})
+          await git(["branch", "-D", exp.exp_branch_name], { cwd: baseRepo }).catch(() => {})
         }
       }
 
@@ -1028,6 +1067,22 @@ export const ResearchRoutes = new Hono()
           macro_table_path: null,
         }
       })
+
+      // Write research project ID to a memo file in the project directory
+      // This allows recovery of the association if the project is deleted and reloaded
+      const memoPath = path.join(target, ".opencode-research.json")
+      await Filesystem.write(
+        memoPath,
+        JSON.stringify(
+          {
+            research_project_id: result.research_project_id,
+            project_id: result.project_id,
+            created_at: Date.now(),
+          },
+          null,
+          2,
+        ),
+      )
 
       return c.json(result)
     },
@@ -1695,7 +1750,15 @@ export const ResearchRoutes = new Hono()
       await Filesystem.write(path.join(expDir, ".keep"), "")
       await Filesystem.write(expPlanPath, "")
 
-      // Create experiment branch from baseline without switching (won't affect running experiments)
+      // Ensure repo is initialised and create worktree for the experiment
+      const initResult = await ensureRepoInitialized(body.codePath)
+      if (!initResult.ok) {
+        return c.json(
+          { success: false, message: `Failed to initialise repo at ${body.codePath}: ${initResult.message}` },
+          400,
+        )
+      }
+
       const baselineExists = await git(["rev-parse", "--verify", body.baselineBranch], { cwd: body.codePath })
       if (baselineExists.exitCode !== 0) {
         return c.json(
@@ -1703,12 +1766,17 @@ export const ResearchRoutes = new Hono()
           400,
         )
       }
-      const createBranch = await git(["branch", expId, body.baselineBranch], { cwd: body.codePath })
-      if (createBranch.exitCode !== 0) {
+
+      const worktreePath = path.join(body.codePath, ".openresearch_worktrees", expId)
+      const createWorktree = await git(["worktree", "add", worktreePath, body.baselineBranch, "-b", expId], {
+        cwd: body.codePath,
+        env: GIT_ENV,
+      })
+      if (createWorktree.exitCode !== 0) {
         return c.json(
           {
             success: false,
-            message: `failed to create branch ${expId} from ${body.baselineBranch}: ${createBranch.stderr?.toString().trim() || "unknown error"}`,
+            message: `failed to create worktree for ${expId}: ${createWorktree.stderr?.toString().trim() || "unknown error"}`,
           },
           400,
         )
@@ -1729,7 +1797,7 @@ export const ResearchRoutes = new Hono()
             exp_result_path: expResultPath,
             exp_result_summary_path: expResultSummaryPath,
             exp_plan_path: expPlanPath,
-            code_path: body.codePath,
+            code_path: worktreePath,
             remote_server_id: body.remoteServerId ?? null,
             status: "pending",
             time_created: now,
@@ -1825,29 +1893,15 @@ export const ResearchRoutes = new Hono()
           },
         },
         404: {
-          description: "Experiment, atom, or article not found",
+          description: "Experiment not found",
           content: {
             "application/json": {
               schema: resolver(z.object({ ready: z.literal(false), message: z.string() })),
             },
           },
         },
-        409: {
-          description: "Another experiment is already running on the same article",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  ready: z.literal(false),
-                  message: z.string(),
-                  conflicts: z.array(z.object({ exp_id: z.string(), exp_session_id: z.string().nullable() })),
-                }),
-              ),
-            },
-          },
-        },
         500: {
-          description: "Git or branch operation failed",
+          description: "Worktree directory does not exist",
           content: {
             "application/json": {
               schema: resolver(z.object({ ready: z.literal(false), message: z.string() })),
@@ -1867,8 +1921,6 @@ export const ResearchRoutes = new Hono()
       switch (result.reason) {
         case "not_found":
           return c.json({ ready: false as const, message: result.message }, 404)
-        case "conflict":
-          return c.json({ ready: false as const, message: result.message, conflicts: result.conflicts }, 409)
         case "git_error":
           return c.json({ ready: false as const, message: result.message }, 500)
       }
@@ -1925,9 +1977,7 @@ export const ResearchRoutes = new Hono()
         failed: "failed",
         canceled: "idle",
       }
-      const resolvedStatus = executionWatch
-        ? (executionStatusMap[executionWatch.status] ?? "pending")
-        : "pending"
+      const resolvedStatus = executionWatch ? (executionStatusMap[executionWatch.status] ?? "pending") : "pending"
 
       const atom = experiment.atom_id
         ? (Database.use((db) => db.select().from(AtomTable).where(eq(AtomTable.atom_id, experiment.atom_id!)).get()) ??
@@ -2154,7 +2204,7 @@ export const ResearchRoutes = new Hono()
                 z.array(
                   z.object({
                     id: z.string(),
-                    config: remoteServerConfigSchema,
+                    config: RemoteServerConfigSchema,
                     time_created: z.number(),
                     time_updated: z.number(),
                   }),
@@ -2170,11 +2220,108 @@ export const ResearchRoutes = new Hono()
       return c.json(
         servers.map((s) => ({
           id: s.id,
-          config: JSON.parse(s.config),
+          config: normalizeRemoteServerConfig(JSON.parse(s.config)),
           time_created: s.time_created,
           time_updated: s.time_updated,
         })),
       )
+    },
+  )
+  .post(
+    "/server/import-ssh-config",
+    describeRoute({
+      summary: "Import remote servers from SSH config",
+      operationId: "research.server.importSshConfig",
+      responses: {
+        200: {
+          description: "Imported remote servers",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.object({
+                  imported: z.array(
+                    z.object({
+                      id: z.string(),
+                      config: RemoteServerConfigSchema,
+                    }),
+                  ),
+                  skipped: z.array(z.string()),
+                }),
+              ),
+            },
+          },
+        },
+        ...errors(400),
+      },
+    }),
+    validator(
+      "json",
+      z.object({
+        path: z.string(),
+      }),
+    ),
+    async (c) => {
+      const body = c.req.valid("json")
+      if (!(await Filesystem.exists(body.path))) {
+        return c.json({ success: false, message: `ssh config not found: ${body.path}` }, 400)
+      }
+
+      const text = await Filesystem.readText(body.path)
+      const hosts = parseSshConfig(text)
+      const rows = Database.use((db) => db.select().from(RemoteServerTable).all())
+      const imported: { id: string; config: RemoteServerConfig }[] = []
+      const skipped: string[] = []
+
+      for (const host of hosts) {
+        const config = normalizeRemoteServerConfig({
+          mode: "ssh_config",
+          host_alias: host.alias,
+          ssh_config_path: body.path,
+          user: host.user,
+        })
+        if (config.mode !== "ssh_config") continue
+
+        const dup = rows.find((row) => {
+          try {
+            const item = normalizeRemoteServerConfig(JSON.parse(row.config))
+            return (
+              item.mode === "ssh_config" &&
+              item.host_alias === config.host_alias &&
+              item.ssh_config_path === config.ssh_config_path
+            )
+          } catch {
+            return false
+          }
+        })
+
+        if (dup) {
+          skipped.push(host.alias)
+          continue
+        }
+
+        const id = uniqueID()
+        const now = Date.now()
+        Database.use((db) =>
+          db
+            .insert(RemoteServerTable)
+            .values({
+              id,
+              config: JSON.stringify(config),
+              time_created: now,
+              time_updated: now,
+            })
+            .run(),
+        )
+        rows.push({
+          id,
+          config: JSON.stringify(config),
+          time_created: now,
+          time_updated: now,
+        })
+        imported.push({ id, config })
+      }
+
+      return c.json({ imported, skipped })
     },
   )
   .post(
@@ -2190,7 +2337,7 @@ export const ResearchRoutes = new Hono()
               schema: resolver(
                 z.object({
                   id: z.string(),
-                  config: remoteServerConfigSchema,
+                  config: RemoteServerConfigSchema,
                 }),
               ),
             },
@@ -2201,11 +2348,12 @@ export const ResearchRoutes = new Hono()
     validator(
       "json",
       z.object({
-        config: remoteServerConfigSchema,
+        config: RemoteServerInputSchema,
       }),
     ),
     async (c) => {
       const body = c.req.valid("json")
+      const config = normalizeRemoteServerConfig(body.config)
       const id = uniqueID()
       const now = Date.now()
       Database.use((db) =>
@@ -2213,13 +2361,13 @@ export const ResearchRoutes = new Hono()
           .insert(RemoteServerTable)
           .values({
             id,
-            config: JSON.stringify(body.config),
+            config: JSON.stringify(config),
             time_created: now,
             time_updated: now,
           })
           .run(),
       )
-      return c.json({ id, config: body.config })
+      return c.json({ id, config })
     },
   )
   .delete(
@@ -2514,18 +2662,11 @@ export const ResearchRoutes = new Hono()
       // Delete experiment results directory
       const expDir = path.join(Instance.directory, "exp_results", expId)
       await rm(expDir, { recursive: true, force: true }).catch(() => {})
-      // Delete experiment branch from the code repo
+      // Remove experiment worktree and branch from the code repo
       if (experiment.exp_branch_name) {
-        const codePath = experiment.code_path
-        // Check if we're on the experiment branch; if so, switch away first
-        const head = await git(["rev-parse", "--abbrev-ref", "HEAD"], { cwd: codePath })
-        const currentBranch = head.stdout?.toString().trim()
-        if (currentBranch === experiment.exp_branch_name) {
-          const baseline = experiment.baseline_branch_name || "master"
-          await git(["checkout", "-f", baseline], { cwd: codePath }).catch(() => {})
-          await git(["clean", "-fd"], { cwd: codePath }).catch(() => {})
-        }
-        await git(["branch", "-D", experiment.exp_branch_name], { cwd: codePath }).catch(() => {})
+        const baseRepo = path.resolve(experiment.code_path, "../..")
+        await git(["worktree", "remove", experiment.code_path, "--force"], { cwd: baseRepo }).catch(() => {})
+        await git(["branch", "-D", experiment.exp_branch_name], { cwd: baseRepo }).catch(() => {})
       }
       return c.json({ success: true })
     },
@@ -2579,5 +2720,742 @@ export const ResearchRoutes = new Hono()
         db.select().from(ExperimentTable).where(eq(ExperimentTable.exp_id, expId)).get(),
       )!
       return c.json(withRemoteServerConfig(updated))
+    },
+  )
+  .post(
+    "/project/:researchProjectId/export",
+    describeRoute({
+      summary: "Export research project",
+      description: "Export research project to a zip file containing all data and files.",
+      operationId: "research.project.export",
+      responses: {
+        200: {
+          description: "Export successful",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.object({
+                  zip_path: z.string(),
+                  zip_name: z.string(),
+                  size: z.number(),
+                }),
+              ),
+            },
+          },
+        },
+        ...errors(404, 500),
+      },
+    }),
+    async (c) => {
+      const researchProjectId = c.req.param("researchProjectId")
+
+      const researchProject = Database.use((db) =>
+        db
+          .select()
+          .from(ResearchProjectTable)
+          .where(eq(ResearchProjectTable.research_project_id, researchProjectId))
+          .get(),
+      )
+      if (!researchProject) {
+        return c.json({ success: false, message: "research project not found" }, 404)
+      }
+
+      const project = Database.use((db) =>
+        db.select().from(ProjectTable).where(eq(ProjectTable.id, researchProject.project_id)).get(),
+      )
+      if (!project) {
+        return c.json({ success: false, message: "project not found" }, 404)
+      }
+
+      try {
+        // Collect all database records
+        const atoms = Database.use((db) =>
+          db.select().from(AtomTable).where(eq(AtomTable.research_project_id, researchProjectId)).all(),
+        )
+        const atomIds = atoms.map((a) => a.atom_id)
+
+        let relations: (typeof AtomRelationTable.$inferSelect)[] = []
+        if (atomIds.length > 0) {
+          const allRelations = Database.use((db) => db.select().from(AtomRelationTable).all())
+          relations = allRelations.filter(
+            (r) => atomIds.includes(r.atom_id_source) || atomIds.includes(r.atom_id_target),
+          )
+        }
+
+        const experiments = Database.use((db) =>
+          db.select().from(ExperimentTable).where(eq(ExperimentTable.research_project_id, researchProjectId)).all(),
+        )
+        const articles = Database.use((db) =>
+          db.select().from(ArticleTable).where(eq(ArticleTable.research_project_id, researchProjectId)).all(),
+        )
+        const codes = Database.use((db) =>
+          db.select().from(CodeTable).where(eq(CodeTable.research_project_id, researchProjectId)).all(),
+        )
+
+        const remoteServerIds = [...new Set(experiments.map((e) => e.remote_server_id).filter(Boolean))] as string[]
+        const remoteServers: (typeof RemoteServerTable.$inferSelect)[] = []
+        for (const serverId of remoteServerIds) {
+          const server = Database.use((db) =>
+            db.select().from(RemoteServerTable).where(eq(RemoteServerTable.id, serverId)).get(),
+          )
+          if (server) remoteServers.push(server)
+        }
+
+        const expIds = experiments.map((e) => e.exp_id)
+        const experimentWatches =
+          expIds.length > 0
+            ? Database.use((db) => db.select().from(ExperimentWatchTable).all()).filter((w) =>
+                expIds.includes(w.exp_id),
+              )
+            : []
+        const experimentExecutionWatches =
+          expIds.length > 0
+            ? Database.use((db) => db.select().from(ExperimentExecutionWatchTable).all()).filter((w) =>
+                expIds.includes(w.exp_id),
+              )
+            : []
+        const localDownloadWatches =
+          expIds.length > 0
+            ? Database.use((db) => db.select().from(LocalDownloadWatchTable).all()).filter((w) =>
+                expIds.includes(w.exp_id),
+              )
+            : []
+
+        // Create metadata
+        const metadata = {
+          version: "1.0",
+          exported_at: Date.now(),
+          source_worktree: project.worktree,
+          research_project: researchProject,
+          atoms,
+          atom_relations: relations,
+          experiments,
+          articles,
+          codes,
+          remote_servers: remoteServers,
+          watches: {
+            experiment_watches: experimentWatches,
+            experiment_execution_watches: experimentExecutionWatches,
+            local_download_watches: localDownloadWatches,
+          },
+        }
+
+        // Create zip file
+        const timestamp = Date.now()
+        const projectName = path.basename(project.worktree).replace(/[^a-zA-Z0-9_-]/g, "_")
+        const zipName = `${projectName}_export_${timestamp}.zip`
+        const zipPath = path.join(path.dirname(project.worktree), zipName)
+
+        const zipWriter = new ZipWriter(new BlobWriter())
+
+        // Add metadata.json
+        const metadataContent = new TextEncoder().encode(JSON.stringify(metadata, null, 2))
+        await zipWriter.add("metadata.json", new BlobReader(new Blob([metadataContent])))
+
+        // Add atom files
+        for (const atom of atoms) {
+          const atomDir = path.join(project.worktree, "atom_list", atom.atom_id)
+          if (await Filesystem.exists(atomDir)) {
+            const addAtomDir = async (dir: string, prefix: string) => {
+              const entries = await fs.promises.readdir(dir, { withFileTypes: true })
+              for (const entry of entries) {
+                const fullPath = path.join(dir, entry.name)
+                const entryZipPath = `${prefix}/${entry.name}`
+                if (entry.isDirectory()) {
+                  await addAtomDir(fullPath, entryZipPath)
+                } else {
+                  const content = await fs.promises.readFile(fullPath)
+                  await zipWriter.add(entryZipPath, new BlobReader(new Blob([new Uint8Array(content)])))
+                }
+              }
+            }
+            await addAtomDir(atomDir, `atom_list/${atom.atom_id}`)
+          }
+        }
+
+        // Add article files
+        for (const article of articles) {
+          if (await Filesystem.exists(article.path)) {
+            if (await Filesystem.isDir(article.path)) {
+              // Article is a directory (e.g. LaTeX source folder), add recursively
+              const addArticleDir = async (dir: string, prefix: string) => {
+                const entries = await fs.promises.readdir(dir, { withFileTypes: true })
+                for (const entry of entries) {
+                  const fullPath = path.join(dir, entry.name)
+                  const entryZipPath = `${prefix}/${entry.name}`
+                  if (entry.isDirectory()) {
+                    await addArticleDir(fullPath, entryZipPath)
+                  } else {
+                    const content = await fs.promises.readFile(fullPath)
+                    await zipWriter.add(entryZipPath, new BlobReader(new Blob([new Uint8Array(content)])))
+                  }
+                }
+              }
+              await addArticleDir(article.path, `articles/${path.basename(article.path)}`)
+            } else {
+              const content = await fs.promises.readFile(article.path)
+              const filename = path.basename(article.path)
+              await zipWriter.add(`articles/${filename}`, new BlobReader(new Blob([new Uint8Array(content)])))
+            }
+          }
+        }
+
+        // Add entire code directory (including .git, worktrees, etc.)
+        const codeRootDir = path.join(project.worktree, "code")
+        if (await Filesystem.exists(codeRootDir)) {
+          const addDirToZip = async (dir: string, prefix: string) => {
+            const entries = await fs.promises.readdir(dir, { withFileTypes: true })
+            for (const entry of entries) {
+              const fullPath = path.join(dir, entry.name)
+              const entryZipPath = `${prefix}/${entry.name}`
+              if (entry.isDirectory()) {
+                await addDirToZip(fullPath, entryZipPath)
+              } else {
+                const content = await fs.promises.readFile(fullPath)
+                await zipWriter.add(entryZipPath, new BlobReader(new Blob([new Uint8Array(content)])))
+              }
+            }
+          }
+          await addDirToZip(codeRootDir, "code")
+        }
+
+        // Add experiment results
+        for (const exp of experiments) {
+          const expDir = path.join(project.worktree, "exp_results", exp.exp_id)
+          if (await Filesystem.exists(expDir)) {
+            const addDirectory = async (dir: string, prefix: string) => {
+              const entries = await fs.promises.readdir(dir, { withFileTypes: true })
+              for (const entry of entries) {
+                const fullPath = path.join(dir, entry.name)
+                const zipPath = path.join(prefix, entry.name)
+                if (entry.isDirectory()) {
+                  await addDirectory(fullPath, zipPath)
+                } else {
+                  const content = await fs.promises.readFile(fullPath)
+                  await zipWriter.add(zipPath, new BlobReader(new Blob([new Uint8Array(content)])))
+                }
+              }
+            }
+            await addDirectory(expDir, `exp_results/${exp.exp_id}`)
+          }
+        }
+
+        // Helper: recursively add a file or directory to zip
+        const addPathToZip = async (fsPath: string, zipPrefix: string) => {
+          if (await Filesystem.isDir(fsPath)) {
+            const entries = await fs.promises.readdir(fsPath, { withFileTypes: true })
+            for (const entry of entries) {
+              const fullPath = path.join(fsPath, entry.name)
+              const entryZipPath = `${zipPrefix}/${entry.name}`
+              if (entry.isDirectory()) {
+                await addPathToZip(fullPath, entryZipPath)
+              } else {
+                const content = await fs.promises.readFile(fullPath)
+                await zipWriter.add(entryZipPath, new BlobReader(new Blob([new Uint8Array(content)])))
+              }
+            }
+          } else {
+            const content = await fs.promises.readFile(fsPath)
+            await zipWriter.add(zipPrefix, new BlobReader(new Blob([new Uint8Array(content)])))
+          }
+        }
+
+        // Add background.md and goal.md if they exist
+        if (researchProject.background_path && (await Filesystem.exists(researchProject.background_path))) {
+          await addPathToZip(researchProject.background_path, path.basename(researchProject.background_path))
+        }
+        if (researchProject.goal_path && (await Filesystem.exists(researchProject.goal_path))) {
+          await addPathToZip(researchProject.goal_path, path.basename(researchProject.goal_path))
+        }
+
+        // Add .opencode-research.json
+        const memoPath = path.join(project.worktree, ".opencode-research.json")
+        if (await Filesystem.exists(memoPath)) {
+          const content = await fs.promises.readFile(memoPath)
+          await zipWriter.add(".opencode-research.json", new BlobReader(new Blob([new Uint8Array(content)])))
+        }
+
+        // Close and save zip
+        const blob = await zipWriter.close()
+        const buffer = await blob.arrayBuffer()
+        await fs.promises.writeFile(zipPath, Buffer.from(buffer))
+
+        return c.json({
+          zip_path: zipPath,
+          zip_name: zipName,
+          size: buffer.byteLength,
+        })
+      } catch (err) {
+        return c.json({ success: false, message: "export failed", error: `${err}` }, 500)
+      }
+    },
+  )
+  .post(
+    "/import-project",
+    describeRoute({
+      summary: "Import research project",
+      description: "Import research project from a zip file.",
+      operationId: "research.project.import",
+      responses: {
+        200: {
+          description: "Import successful",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.object({
+                  project_id: z.string(),
+                  research_project_id: z.string(),
+                }),
+              ),
+            },
+          },
+        },
+        ...errors(400, 500),
+      },
+    }),
+    validator(
+      "json",
+      z.object({
+        zipPath: z.string().min(1, "zipPath required"),
+        targetDirectory: z.string().min(1, "targetDirectory required"),
+      }),
+    ),
+    async (c) => {
+      const body = c.req.valid("json")
+      const zipPath = Filesystem.resolve(body.zipPath)
+      const targetDir = Filesystem.resolve(body.targetDirectory)
+
+      if (!(await Filesystem.exists(zipPath))) {
+        return c.json({ success: false, message: "zip file not found" }, 400)
+      }
+
+      if (await Filesystem.exists(targetDir)) {
+        return c.json({ success: false, message: "target directory already exists" }, 400)
+      }
+
+      try {
+        // Extract zip to target directory using @zip.js/zip.js
+        await fs.promises.mkdir(targetDir, { recursive: true })
+
+        const zipData = await fs.promises.readFile(zipPath)
+        const zipReader = new ZipReader(new BlobReader(new Blob([new Uint8Array(zipData)])))
+        const entries = await zipReader.getEntries()
+
+        for (const entry of entries) {
+          if (entry.directory || !entry.getData) continue
+          const entryPath = path.join(targetDir, entry.filename)
+          await fs.promises.mkdir(path.dirname(entryPath), { recursive: true })
+          const blob = await entry.getData(new BlobWriter())
+          const buffer = await blob.arrayBuffer()
+          await fs.promises.writeFile(entryPath, Buffer.from(buffer))
+        }
+        await zipReader.close()
+
+        // Read metadata
+        const metadataPath = path.join(targetDir, "metadata.json")
+        if (!(await Filesystem.exists(metadataPath))) {
+          throw new Error("metadata.json not found in zip")
+        }
+
+        const metadata = await Filesystem.readJson<{
+          version: string
+          source_worktree?: string
+          research_project: typeof ResearchProjectTable.$inferSelect
+          atoms: (typeof AtomTable.$inferSelect)[]
+          atom_relations: (typeof AtomRelationTable.$inferSelect)[]
+          experiments: (typeof ExperimentTable.$inferSelect)[]
+          articles: (typeof ArticleTable.$inferSelect)[]
+          codes: (typeof CodeTable.$inferSelect)[]
+          remote_servers: (typeof RemoteServerTable.$inferSelect)[]
+          watches: {
+            experiment_watches: (typeof ExperimentWatchTable.$inferSelect)[]
+            experiment_execution_watches: (typeof ExperimentExecutionWatchTable.$inferSelect)[]
+            local_download_watches: (typeof LocalDownloadWatchTable.$inferSelect)[]
+          }
+        }>(metadataPath)
+
+        // Initialize git repository
+        await Filesystem.write(path.join(targetDir, ".gitignore"), "/code/\n")
+        const init = await git(["init", "--quiet"], { cwd: targetDir })
+        if (init.exitCode !== 0) throw new Error(gitError(init, "failed to initialize git repository"))
+
+        const add = await git(["add", "."], { cwd: targetDir })
+        if (add.exitCode !== 0) throw new Error(gitError(add, "failed to stage files"))
+
+        const commit = await git(["commit", "-m", "Imported research project", "--allow-empty"], {
+          cwd: targetDir,
+          env: {
+            ...process.env,
+            GIT_AUTHOR_NAME: process.env.GIT_AUTHOR_NAME || "OpenCode",
+            GIT_AUTHOR_EMAIL: process.env.GIT_AUTHOR_EMAIL || "opencode@local",
+            GIT_COMMITTER_NAME: process.env.GIT_COMMITTER_NAME || "OpenCode",
+            GIT_COMMITTER_EMAIL: process.env.GIT_COMMITTER_EMAIL || "opencode@local",
+          },
+        })
+        if (commit.exitCode !== 0) throw new Error(gitError(commit, "failed to create initial commit"))
+
+        // Create project
+        const project = await Project.fromDirectory(targetDir)
+        if (project.project.id === "global") throw new Error("failed to resolve project id")
+
+        await Instance.reload({
+          directory: targetDir,
+          worktree: targetDir,
+          project: project.project,
+        }).catch(() => {})
+
+        // Check if research project already exists
+        const existing = Database.use((db) =>
+          db
+            .select({ research_project_id: ResearchProjectTable.research_project_id })
+            .from(ResearchProjectTable)
+            .where(eq(ResearchProjectTable.project_id, project.project.id))
+            .get(),
+        )
+        if (existing) {
+          return c.json(
+            {
+              success: false,
+              message: "research project already exists for this git repository",
+              research_project_id: existing.research_project_id,
+              project_id: project.project.id,
+            },
+            400,
+          )
+        }
+
+        // Import database records with new IDs
+        const result = Database.transaction(() => {
+          const now = Date.now()
+          const newResearchProjectId = uniqueID()
+          const oldToNewAtomId = new Map<string, string>()
+          const oldToNewExpId = new Map<string, string>()
+          const oldToNewArticleId = new Map<string, string>()
+          const oldToNewCodeId = new Map<string, string>()
+
+          // Create research project
+          const backgroundPath = metadata.research_project.background_path
+            ? path.join(targetDir, path.basename(metadata.research_project.background_path))
+            : null
+          const goalPath = metadata.research_project.goal_path
+            ? path.join(targetDir, path.basename(metadata.research_project.goal_path))
+            : null
+
+          Database.use((db) =>
+            db
+              .insert(ResearchProjectTable)
+              .values({
+                research_project_id: newResearchProjectId,
+                project_id: project.project.id,
+                background_path: backgroundPath,
+                goal_path: goalPath,
+                macro_table_path: null,
+                time_created: now,
+                time_updated: now,
+              })
+              .run(),
+          )
+
+          // Import atoms
+          for (const atom of metadata.atoms) {
+            const newAtomId = uniqueID()
+            oldToNewAtomId.set(atom.atom_id, newAtomId)
+
+            const atomDir = path.join(targetDir, "atom_list", newAtomId)
+            const oldAtomDir = path.join(targetDir, "atom_list", atom.atom_id)
+
+            // Rename atom directory
+            if (fs.existsSync(oldAtomDir)) {
+              fs.renameSync(oldAtomDir, atomDir)
+            }
+
+            Database.use((db) =>
+              db
+                .insert(AtomTable)
+                .values({
+                  atom_id: newAtomId,
+                  research_project_id: newResearchProjectId,
+                  atom_name: atom.atom_name,
+                  atom_type: atom.atom_type,
+                  atom_claim_path: path.join(atomDir, "claim.md"),
+                  atom_evidence_type: atom.atom_evidence_type,
+                  atom_evidence_status: atom.atom_evidence_status,
+                  atom_evidence_path: path.join(atomDir, "evidence.md"),
+                  atom_evidence_assessment_path: path.join(atomDir, "evidence_assessment.md"),
+                  article_id: null, // Will be updated later
+                  session_id: null, // Sessions are not imported
+                  time_created: now,
+                  time_updated: now,
+                })
+                .run(),
+            )
+          }
+
+          // Import articles
+          for (const article of metadata.articles) {
+            const newArticleId = uniqueID()
+            oldToNewArticleId.set(article.article_id, newArticleId)
+
+            const articlePath = path.join(targetDir, "articles", path.basename(article.path))
+
+            Database.use((db) =>
+              db
+                .insert(ArticleTable)
+                .values({
+                  article_id: newArticleId,
+                  research_project_id: newResearchProjectId,
+                  path: articlePath,
+                  title: article.title,
+                  source_url: article.source_url,
+                  status: article.status,
+                  time_created: now,
+                  time_updated: now,
+                })
+                .run(),
+            )
+          }
+
+          // Update atom article references
+          for (const atom of metadata.atoms) {
+            if (atom.article_id) {
+              const newAtomId = oldToNewAtomId.get(atom.atom_id)
+              const newArticleId = oldToNewArticleId.get(atom.article_id)
+              if (newAtomId && newArticleId) {
+                Database.use((db) =>
+                  db.update(AtomTable).set({ article_id: newArticleId }).where(eq(AtomTable.atom_id, newAtomId)).run(),
+                )
+              }
+            }
+          }
+
+          // Import atom relations
+          for (const relation of metadata.atom_relations) {
+            const newSourceId = oldToNewAtomId.get(relation.atom_id_source)
+            const newTargetId = oldToNewAtomId.get(relation.atom_id_target)
+            if (newSourceId && newTargetId) {
+              Database.use((db) =>
+                db
+                  .insert(AtomRelationTable)
+                  .values({
+                    atom_id_source: newSourceId,
+                    atom_id_target: newTargetId,
+                    relation_type: relation.relation_type,
+                    note: relation.note,
+                    time_created: now,
+                    time_updated: now,
+                  })
+                  .run(),
+              )
+            }
+          }
+
+          // Import codes
+          for (const code of metadata.codes) {
+            const newCodeId = uniqueID()
+            oldToNewCodeId.set(code.code_id, newCodeId)
+
+            Database.use((db) =>
+              db
+                .insert(CodeTable)
+                .values({
+                  code_id: newCodeId,
+                  research_project_id: newResearchProjectId,
+                  code_name: code.code_name,
+                  article_id: code.article_id ? (oldToNewArticleId.get(code.article_id) ?? null) : null,
+                  time_created: now,
+                  time_updated: now,
+                })
+                .run(),
+            )
+          }
+
+          // Import experiments (keep original exp_id to match existing worktrees)
+          for (const exp of metadata.experiments) {
+            oldToNewExpId.set(exp.exp_id, exp.exp_id)
+
+            const expDir = path.join(targetDir, "exp_results", exp.exp_id)
+            const codeName = path.basename(path.resolve(exp.code_path, "../.."))
+            const newCodePath = path.join(targetDir, "code", codeName, ".openresearch_worktrees", exp.exp_id)
+
+            Database.use((db) =>
+              db
+                .insert(ExperimentTable)
+                .values({
+                  exp_id: exp.exp_id,
+                  research_project_id: newResearchProjectId,
+                  exp_name: exp.exp_name,
+                  exp_session_id: null, // Sessions are not imported
+                  baseline_branch_name: exp.baseline_branch_name,
+                  exp_branch_name: exp.exp_branch_name,
+                  exp_result_path: expDir,
+                  atom_id: exp.atom_id ? (oldToNewAtomId.get(exp.atom_id) ?? null) : null,
+                  exp_result_summary_path: exp.exp_result_summary_path
+                    ? path.join(expDir, path.basename(exp.exp_result_summary_path))
+                    : null,
+                  exp_plan_path: exp.exp_plan_path ? path.join(expDir, path.basename(exp.exp_plan_path)) : null,
+                  remote_server_id: null, // Remote servers are not imported
+                  code_path: newCodePath,
+                  status: "idle",
+                  started_at: null,
+                  finished_at: null,
+                  time_created: now,
+                  time_updated: now,
+                })
+                .run(),
+            )
+          }
+
+          // Import experiment watches
+          if (metadata.watches) {
+            for (const w of metadata.watches.experiment_watches ?? []) {
+              const newExpId = oldToNewExpId.get(w.exp_id)
+              if (!newExpId) continue
+              Database.use((db) =>
+                db
+                  .insert(ExperimentWatchTable)
+                  .values({
+                    watch_id: uniqueID(),
+                    exp_id: newExpId,
+                    wandb_entity: w.wandb_entity,
+                    wandb_project: w.wandb_project,
+                    wandb_api_key: w.wandb_api_key,
+                    wandb_run_id: w.wandb_run_id,
+                    status: w.status,
+                    last_polled_at: w.last_polled_at,
+                    wandb_state: w.wandb_state,
+                    error_message: w.error_message,
+                    time_created: now,
+                    time_updated: now,
+                  })
+                  .run(),
+              )
+            }
+
+            for (const w of metadata.watches.experiment_execution_watches ?? []) {
+              const newExpId = oldToNewExpId.get(w.exp_id)
+              if (!newExpId) continue
+              Database.use((db) =>
+                db
+                  .insert(ExperimentExecutionWatchTable)
+                  .values({
+                    watch_id: uniqueID(),
+                    exp_id: newExpId,
+                    status: w.status,
+                    stage: w.stage,
+                    title: w.title,
+                    message: w.message,
+                    wandb_entity: w.wandb_entity,
+                    wandb_project: w.wandb_project,
+                    wandb_run_id: w.wandb_run_id,
+                    error_message: w.error_message,
+                    started_at: w.started_at,
+                    finished_at: w.finished_at,
+                    time_created: now,
+                    time_updated: now,
+                  })
+                  .run(),
+              )
+            }
+
+            for (const w of metadata.watches.local_download_watches ?? []) {
+              const newExpId = oldToNewExpId.get(w.exp_id)
+              if (!newExpId) continue
+              Database.use((db) =>
+                db
+                  .insert(LocalDownloadWatchTable)
+                  .values({
+                    watch_id: uniqueID(),
+                    exp_id: newExpId,
+                    resource_key: w.resource_key,
+                    resource_name: w.resource_name,
+                    resource_type: w.resource_type,
+                    status: w.status,
+                    local_resource_root: w.local_resource_root,
+                    local_path: w.local_path,
+                    pid: null,
+                    log_path: w.log_path,
+                    status_path: w.status_path,
+                    source_selection: w.source_selection,
+                    method: w.method,
+                    error_message: w.error_message,
+                    last_polled_at: w.last_polled_at,
+                    time_created: now,
+                    time_updated: now,
+                  })
+                  .run(),
+              )
+            }
+          }
+
+          return {
+            project_id: project.project.id,
+            research_project_id: newResearchProjectId,
+          }
+        })
+
+        // Fix git worktree absolute paths
+        if (metadata.source_worktree) {
+          const codeDir = path.join(targetDir, "code")
+          if (await Filesystem.exists(codeDir)) {
+            const codeEntries = await fs.promises.readdir(codeDir, { withFileTypes: true })
+            for (const codeEntry of codeEntries) {
+              if (!codeEntry.isDirectory()) continue
+              const repoDir = path.join(codeDir, codeEntry.name)
+              const gitWorktreesDir = path.join(repoDir, ".git", "worktrees")
+              if (!(await Filesystem.exists(gitWorktreesDir))) continue
+
+              const wtEntries = await fs.promises.readdir(gitWorktreesDir, { withFileTypes: true })
+              for (const wtEntry of wtEntries) {
+                if (!wtEntry.isDirectory()) continue
+                // Fix .git/worktrees/<name>/gitdir -> points to worktree's .git file
+                const gitdirFile = path.join(gitWorktreesDir, wtEntry.name, "gitdir")
+                if (await Filesystem.exists(gitdirFile)) {
+                  const content = (await fs.promises.readFile(gitdirFile, "utf-8")).trim()
+                  const fixed = content.replace(metadata.source_worktree, targetDir)
+                  await fs.promises.writeFile(gitdirFile, fixed + "\n")
+                }
+              }
+
+              // Fix worktree .git files -> point back to main repo's .git/worktrees/<name>
+              const worktreesRoot = path.join(repoDir, ".openresearch_worktrees")
+              if (!(await Filesystem.exists(worktreesRoot))) continue
+              const expEntries = await fs.promises.readdir(worktreesRoot, { withFileTypes: true })
+              for (const expEntry of expEntries) {
+                if (!expEntry.isDirectory()) continue
+                const dotGitFile = path.join(worktreesRoot, expEntry.name, ".git")
+                if (await Filesystem.exists(dotGitFile)) {
+                  const content = (await fs.promises.readFile(dotGitFile, "utf-8")).trim()
+                  const fixed = content.replace(metadata.source_worktree, targetDir)
+                  await fs.promises.writeFile(dotGitFile, fixed + "\n")
+                }
+              }
+            }
+          }
+        }
+
+        // Write memo file
+        const memoPath = path.join(targetDir, ".opencode-research.json")
+        await Filesystem.write(
+          memoPath,
+          JSON.stringify(
+            {
+              research_project_id: result.research_project_id,
+              project_id: result.project_id,
+              created_at: Date.now(),
+            },
+            null,
+            2,
+          ),
+        )
+
+        // Clean up metadata.json
+        await fs.promises.unlink(metadataPath).catch(() => {})
+
+        return c.json(result)
+      } catch (err) {
+        // Clean up on failure
+        await rm(targetDir, { recursive: true, force: true }).catch(() => {})
+        return c.json({ success: false, message: "import failed", error: `${err}` }, 500)
+      }
     },
   )

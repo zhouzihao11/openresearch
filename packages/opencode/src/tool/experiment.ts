@@ -7,6 +7,7 @@ import { Research } from "../research/research"
 import { Instance } from "../project/instance"
 import { Filesystem } from "../util/filesystem"
 import { git } from "../util/git"
+import { ensureRepoInitialized, GIT_ENV } from "../session/experiment-guard"
 import { ExperimentExecutionWatch } from "../research/experiment-execution-watch"
 import { Session } from "@/session"
 
@@ -55,7 +56,16 @@ export const ExperimentCreateTool = Tool.define("experiment_create", {
     await Filesystem.write(path.join(expDir, ".keep"), "")
     await Filesystem.write(expPlanPath, "")
 
-    // Create experiment branch from baseline without switching
+    // Ensure repo is initialised and create worktree for the experiment
+    const initResult = await ensureRepoInitialized(params.codePath)
+    if (!initResult.ok) {
+      return {
+        title: "Failed",
+        output: `Failed to initialise repo at ${params.codePath}: ${initResult.message}`,
+        metadata: { expId: undefined as string | undefined },
+      }
+    }
+
     const baselineExists = await git(["rev-parse", "--verify", params.baselineBranch], { cwd: params.codePath })
     if (baselineExists.exitCode !== 0) {
       return {
@@ -64,11 +74,16 @@ export const ExperimentCreateTool = Tool.define("experiment_create", {
         metadata: { expId: undefined as string | undefined },
       }
     }
-    const createBranch = await git(["branch", expId, params.baselineBranch], { cwd: params.codePath })
-    if (createBranch.exitCode !== 0) {
+
+    const worktreePath = path.join(params.codePath, ".openresearch_worktrees", expId)
+    const createWorktree = await git(["worktree", "add", worktreePath, params.baselineBranch, "-b", expId], {
+      cwd: params.codePath,
+      env: GIT_ENV,
+    })
+    if (createWorktree.exitCode !== 0) {
       return {
         title: "Failed",
-        output: `Failed to create branch ${expId} from ${params.baselineBranch}: ${createBranch.stderr?.toString().trim() || "unknown error"}`,
+        output: `Failed to create worktree for ${expId}: ${createWorktree.stderr?.toString().trim() || "unknown error"}`,
         metadata: { expId: undefined as string | undefined },
       }
     }
@@ -88,7 +103,7 @@ export const ExperimentCreateTool = Tool.define("experiment_create", {
           exp_result_path: expResultPath,
           exp_result_summary_path: expResultSummaryPath,
           exp_plan_path: expPlanPath,
-          code_path: params.codePath,
+          code_path: worktreePath,
           remote_server_id: params.remoteServerId ?? null,
           status: "pending",
           time_created: now,

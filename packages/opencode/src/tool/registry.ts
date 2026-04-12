@@ -30,7 +30,7 @@ import { LspTool } from "./lsp"
 import { Truncate } from "./truncation"
 
 import { ApplyPatchTool } from "./apply_patch"
-import { ArticleQueryTool } from "@/tool/article.ts"
+import { ArticleQueryTool, ArticleStatusUpdateTool } from "@/tool/article.ts"
 import {
   AtomCreateTool,
   AtomQueryTool,
@@ -52,6 +52,7 @@ import { ExperimentWatchTool } from "./experiment-watch"
 import { ExperimentExecutionWatchInitTool, ExperimentExecutionWatchUpdateTool } from "./experiment-execution-watch"
 import { ExperimentResourceJobStartTool } from "./experiment-resource-job"
 import { ConvertTool } from "./convert"
+import { WorkflowTool } from "./workflow"
 import {
   ExperimentLocalDownloadWatchInitTool,
   ExperimentLocalDownloadWatchRefreshTool,
@@ -149,6 +150,7 @@ export namespace ToolRegistry {
       SkillTool,
       ApplyPatchTool,
       ArticleQueryTool,
+      ArticleStatusUpdateTool,
       AtomCreateTool,
       AtomQueryTool,
       AtomBatchCreateTool,
@@ -174,6 +176,7 @@ export namespace ToolRegistry {
       ExperimentLocalDownloadWatchUpdateTool,
       ExperimentLocalDownloadWatchRefreshTool,
       ConvertTool,
+      WorkflowTool,
       ...(Flag.OPENCODE_EXPERIMENTAL_LSP_TOOL ? [LspTool] : []),
       ...(config.experimental?.batch_tool === true ? [BatchTool] : []),
       ...(Flag.OPENCODE_EXPERIMENTAL_PLAN_MODE && Flag.OPENCODE_CLIENT === "cli" ? [PlanExitTool] : []),

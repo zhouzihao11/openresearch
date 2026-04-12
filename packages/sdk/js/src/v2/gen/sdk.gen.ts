@@ -156,8 +156,12 @@ import type {
   ResearchExperimentWatchRefreshResponses,
   ResearchProjectCreateErrors,
   ResearchProjectCreateResponses,
+  ResearchProjectExportErrors,
+  ResearchProjectExportResponses,
   ResearchProjectGetErrors,
   ResearchProjectGetResponses,
+  ResearchProjectImportErrors,
+  ResearchProjectImportResponses,
   ResearchProjectSessionTreeErrors,
   ResearchProjectSessionTreeResponses,
   ResearchRelationCreateErrors,
@@ -169,6 +173,8 @@ import type {
   ResearchServerCreateResponses,
   ResearchServerDeleteErrors,
   ResearchServerDeleteResponses,
+  ResearchServerImportSshConfigErrors,
+  ResearchServerImportSshConfigResponses,
   ResearchServerListResponses,
   ResearchSessionAtomGetErrors,
   ResearchSessionAtomGetResponses,
@@ -219,6 +225,8 @@ import type {
   SessionUnshareResponses,
   SessionUpdateErrors,
   SessionUpdateResponses,
+  SessionWorkflowErrors,
+  SessionWorkflowResponses,
   SubtaskPartInput,
   TextPartInput,
   ToolIdsErrors,
@@ -1630,6 +1638,38 @@ export class Session2 extends HeyApiClient {
   }
 
   /**
+   * Get session workflow
+   *
+   * Retrieve the latest workflow state for a session.
+   */
+  public workflow<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<SessionWorkflowResponses, SessionWorkflowErrors, ThrowOnError>({
+      url: "/session/{sessionID}/workflow",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
    * Initialize session
    *
    * Analyze the current application and create an AGENTS.md file with project-specific agent configurations.
@@ -2596,6 +2636,85 @@ export class Project2 extends HeyApiClient {
       url: "/research/project/{researchProjectId}/session-tree",
       ...options,
       ...params,
+    })
+  }
+
+  /**
+   * Export research project
+   *
+   * Export research project to a zip file containing all data and files.
+   */
+  public export<ThrowOnError extends boolean = false>(
+    parameters: {
+      researchProjectId: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "researchProjectId" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ResearchProjectExportResponses,
+      ResearchProjectExportErrors,
+      ThrowOnError
+    >({
+      url: "/research/project/{researchProjectId}/export",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Import research project
+   *
+   * Import research project from a zip file.
+   */
+  public import<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      zipPath?: string
+      targetDirectory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "zipPath" },
+            { in: "body", key: "targetDirectory" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ResearchProjectImportResponses,
+      ResearchProjectImportErrors,
+      ThrowOnError
+    >({
+      url: "/research/import-project",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 }
@@ -3566,15 +3685,36 @@ export class Server extends HeyApiClient {
     parameters?: {
       directory?: string
       workspace?: string
-      config?: {
-        address: string
-        port: number
-        user: string
-        password: string
-        resource_root?: string
-        wandb_api_key?: string
-        wandb_project_name?: string
-      }
+      config?:
+        | {
+            mode: "direct"
+            address: string
+            port: number
+            user: string
+            password?: string
+            resource_root?: string
+            wandb_api_key?: string
+            wandb_project_name?: string
+          }
+        | {
+            mode: "ssh_config"
+            host_alias: string
+            ssh_config_path?: string
+            user?: string
+            password?: string
+            resource_root?: string
+            wandb_api_key?: string
+            wandb_project_name?: string
+          }
+        | {
+            address: string
+            port: number
+            user: string
+            password?: string
+            resource_root?: string
+            wandb_api_key?: string
+            wandb_project_name?: string
+          }
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -3592,6 +3732,45 @@ export class Server extends HeyApiClient {
     )
     return (options?.client ?? this.client).post<ResearchServerCreateResponses, unknown, ThrowOnError>({
       url: "/research/server",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Import remote servers from SSH config
+   */
+  public importSshConfig<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      path?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "path" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ResearchServerImportSshConfigResponses,
+      ResearchServerImportSshConfigErrors,
+      ThrowOnError
+    >({
+      url: "/research/server/import-ssh-config",
       ...options,
       ...params,
       headers: {

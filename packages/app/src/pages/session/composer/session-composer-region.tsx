@@ -10,6 +10,7 @@ import { SessionPermissionDock } from "@/pages/session/composer/session-permissi
 import { SessionQuestionDock } from "@/pages/session/composer/session-question-dock"
 import type { SessionComposerState } from "@/pages/session/composer/session-composer-state"
 import { SessionTodoDock } from "@/pages/session/composer/session-todo-dock"
+import { SessionWorkflowDock } from "@/pages/session/composer/session-workflow-dock"
 
 export function SessionComposerRegion(props: {
   state: SessionComposerState
@@ -178,34 +179,56 @@ export function SessionComposerRegion(props: {
             <Show when={dock()}>
               <div
                 classList={{
-                  "overflow-hidden": true,
+                  "overflow-hidden": value() < 0.98,
                   "pointer-events-none": value() < 0.98,
                 }}
                 style={{
-                  "max-height": `${full() * value()}px`,
+                  "max-height": value() >= 0.98 ? "none" : `${full() * value()}px`,
                 }}
               >
-                <div ref={setContentRef}>
-                  <SessionTodoDock
-                    todos={props.state.todos()}
-                    title={language.t("session.todo.title")}
-                    collapseLabel={language.t("session.todo.collapse")}
-                    expandLabel={language.t("session.todo.expand")}
-                    dockProgress={value()}
-                    visualDuration={props.visualDuration}
-                    bounce={props.bounce}
-                    expandVisualDuration={props.drawerExpandVisualDuration}
-                    expandBounce={props.drawerExpandBounce}
-                    collapseVisualDuration={props.drawerCollapseVisualDuration}
-                    collapseBounce={props.drawerCollapseBounce}
-                    subtitleDuration={props.subtitleDuration}
-                    subtitleTravel={props.subtitleTravel}
-                    subtitleEdge={props.subtitleEdge}
-                    countDuration={props.countDuration}
-                    countMask={props.countMask}
-                    countMaskHeight={props.countMaskHeight}
-                    countWidthDuration={props.countWidthDuration}
-                  />
+                <div ref={setContentRef} class="pb-9">
+                  <Show when={props.state.workflow()} keyed>
+                    {(workflow) => (
+                      <div class="mb-3">
+                        <SessionWorkflowDock
+                          workflow={workflow}
+                          title={language.t("session.workflow.title")}
+                          collapseLabel={language.t("session.workflow.collapse")}
+                          expandLabel={language.t("session.workflow.expand")}
+                          stepLabel={language.t("session.workflow.step")}
+                          waitingLabel={language.t("session.workflow.waiting")}
+                          runningLabel={language.t("session.workflow.running")}
+                          completedLabel={language.t("session.workflow.completed")}
+                          failedLabel={language.t("session.workflow.failed")}
+                          failedManualLabel={language.t("session.workflow.failedManual")}
+                          failedAutoLabel={language.t("session.workflow.failedAuto")}
+                          cancelledLabel={language.t("session.workflow.cancelled")}
+                        />
+                      </div>
+                    )}
+                  </Show>
+                  <Show when={props.state.todos().length > 0}>
+                    <SessionTodoDock
+                      todos={props.state.todos()}
+                      title={language.t("session.todo.title")}
+                      collapseLabel={language.t("session.todo.collapse")}
+                      expandLabel={language.t("session.todo.expand")}
+                      dockProgress={value()}
+                      visualDuration={props.visualDuration}
+                      bounce={props.bounce}
+                      expandVisualDuration={props.drawerExpandVisualDuration}
+                      expandBounce={props.drawerExpandBounce}
+                      collapseVisualDuration={props.drawerCollapseVisualDuration}
+                      collapseBounce={props.drawerCollapseBounce}
+                      subtitleDuration={props.subtitleDuration}
+                      subtitleTravel={props.subtitleTravel}
+                      subtitleEdge={props.subtitleEdge}
+                      countDuration={props.countDuration}
+                      countMask={props.countMask}
+                      countMaskHeight={props.countMaskHeight}
+                      countWidthDuration={props.countWidthDuration}
+                    />
+                  </Show>
                 </div>
               </div>
             </Show>

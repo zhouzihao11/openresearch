@@ -684,6 +684,24 @@ export function AtomGraphView(props: {
     ro.observe(containerRef)
   })
 
+  // Reinitialize stateManager when researchProjectId changes
+  createEffect(() => {
+    const projectId = props.researchProjectId
+    if (stateManager && stateManager.getProjectId() !== projectId) {
+      stateManager = new GraphStateManager(projectId)
+      if (graph) {
+        const graphState = stateManager.loadState()
+        if (graphState == null) {
+          graph.render().then(() => {
+            saveCurrentState()
+          })
+        } else {
+          applySavedPositions(graphState).then(() => {})
+        }
+      }
+    }
+  })
+
   const toGraphData = () => {
     // Compute 2nd-order degree for each node (unique nodes reachable within 2 hops)
     const adj = new Map<string, Set<string>>()
@@ -1083,7 +1101,7 @@ export function AtomGraphView(props: {
 
       setupTooltip()
       const graphState = stateManager?.loadState()
-      if (graphState == null) {
+      if (!graphState || !canRestore(graphState)) {
         graph.render().then(() => {
           saveCurrentState()
         })
@@ -1096,6 +1114,15 @@ export function AtomGraphView(props: {
         graph = undefined
       }
     }
+  }
+
+  const canRestore = (state: GraphState | null) => {
+    if (!state?.positions) return false
+
+    const saved = new Set(Object.keys(state.positions))
+    if (saved.size !== props.atoms.length) return false
+
+    return props.atoms.every((atom) => saved.has(atom.atom_id))
   }
 
   const applySavedPositions = async (savedState: GraphState) => {
@@ -1219,7 +1246,7 @@ export function AtomGraphView(props: {
     try {
       graph.setData(toGraphData())
       const graphState = stateManager.loadState()
-      if (graphState == null) {
+      if (!graphState || !canRestore(graphState)) {
         graph.render().then(() => {
           saveCurrentState()
         })

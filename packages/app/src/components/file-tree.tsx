@@ -153,7 +153,7 @@ const FileTreeNode = (
         [local.class ?? ""]: !!local.class,
         [local.nodeClass ?? ""]: !!local.nodeClass,
       }}
-      style={`padding-left: ${Math.max(0, 8 + local.level * 12 - (local.node.type === "file" ? 24 : 4))}px`}
+      style={`padding-left: ${local.level === 0 ? 6 : Math.max(0, 8 + local.level * 12 - (local.node.type === "file" ? 24 : 4))}px`}
       draggable={local.draggable}
       onDragStart={(event: DragEvent) => {
         if (!local.draggable) return
@@ -426,7 +426,7 @@ export default function FileTree(props: {
                         "group-hover/filetree:opacity-100": expanded() && deep() === level,
                         "group-hover/filetree:opacity-50": !(expanded() && deep() === level),
                       }}
-                      style={`left: ${Math.max(0, 8 + level * 12 - 4) + 8}px`}
+                      style={`left: ${level === 0 ? 14 : Math.max(0, 8 + level * 12 - 4) + 8}px`}
                     />
                     <Show
                       when={level < MAX_DEPTH && !chain.includes(key(node.path))}

@@ -1769,7 +1769,7 @@ export default function Layout(props: ParentProps) {
       if (state.deleting) return
       setState("deleting", true)
       dialog.close()
-      const deleted = await deleteProject(props.project, state.removeLocal)
+      const deleted = await deleteProject(props.project, true)
       if (!deleted) setState("deleting", false)
     }
 
@@ -1781,17 +1781,6 @@ export default function Layout(props: ParentProps) {
               {language.t("dialog.project.delete.confirm", { name: name() })}
             </span>
             <span class="text-12-regular text-text-weak">{language.t("dialog.project.delete.description")}</span>
-          </div>
-          <div class="flex flex-col gap-2">
-            <label class="flex items-start gap-2 cursor-pointer">
-              <Checkbox checked={state.removeLocal} onChange={(checked) => setState("removeLocal", checked)} />
-              <div class="flex flex-col gap-0.5">
-                <span class="text-13-regular text-text-strong">{language.t("dialog.project.delete.removeLocal")}</span>
-                <span class="text-12-regular text-text-weak">
-                  {language.t("dialog.project.delete.removeLocal.description")}
-                </span>
-              </div>
-            </label>
           </div>
           <div class="flex justify-end gap-2">
             <Button variant="ghost" size="large" onClick={() => dialog.close()}>
