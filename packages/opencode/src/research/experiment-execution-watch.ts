@@ -1,10 +1,5 @@
 import { and, Database, eq } from "../storage/db"
-import {
-  ExperimentExecutionWatchTable,
-  ExperimentTable,
-  ExperimentWatchTable,
-  LocalDownloadWatchTable,
-} from "./research.sql"
+import { ExperimentExecutionWatchTable, ExperimentTable, ExperimentWatchTable } from "./research.sql"
 
 type ExecutionStatus = typeof ExperimentExecutionWatchTable.$inferSelect.status
 type ExecutionStage = typeof ExperimentExecutionWatchTable.$inferSelect.stage
@@ -22,6 +17,10 @@ interface UpdateInput {
   errorMessage?: string | null
   startedAt?: number | null
   finishedAt?: number | null
+}
+
+interface SyncOptions {
+  preserveStage?: boolean
 }
 
 function row(input: { expId?: string; watchId?: string }) {
@@ -105,79 +104,24 @@ export namespace ExperimentExecutionWatch {
     )
   }
 
-  export function syncWatch(expId: string, watch: typeof ExperimentWatchTable.$inferSelect) {
+  export function syncWatch(expId: string, watch: typeof ExperimentWatchTable.$inferSelect, _opts?: SyncOptions) {
     createOrGet(expId, title(expId))
     update({
       expId,
       status: watch.status === "finished" ? "finished" : watch.status === "running" ? "running" : "failed",
-      stage: "watching_wandb",
+      stage: undefined,
       wandbEntity: watch.wandb_entity,
       wandbProject: watch.wandb_project,
       wandbRunId: watch.wandb_run_id,
-      message:
-        watch.status === "finished"
-          ? "Experiment finished successfully"
-          : watch.status === "running"
-            ? "Monitoring W&B run"
-            : `Experiment ended with W&B state: ${watch.wandb_state ?? watch.status}`,
+      message: undefined,
       errorMessage: watch.status === "finished" ? null : watch.error_message,
       finishedAt:
         watch.status === "finished" || watch.status === "failed" || watch.status === "crashed" ? Date.now() : null,
     })
   }
 
-  export function syncLocalDownload(expId: string) {
+  export function syncRemoteTask(expId: string, _opts?: SyncOptions) {
     createOrGet(expId, title(expId))
-    const rows = Database.use((db) =>
-      db.select().from(LocalDownloadWatchTable).where(eq(LocalDownloadWatchTable.exp_id, expId)).all(),
-    )
-    if (!rows.length) {
-      update({
-        expId,
-        status: "running",
-        stage: "local_downloading",
-        message: "Waiting for local download to start",
-        errorMessage: null,
-      })
-      return
-    }
-
-    const done = rows.filter((row) => row.status === "finished").length
-    const failed = rows.find((row) => row.status === "failed" || row.status === "crashed")
-    const running = rows.find((row) => row.status === "running" || row.status === "pending")
-
-    if (failed) {
-      update({
-        expId,
-        status: "failed",
-        stage: "local_downloading",
-        message: `Local download failed for ${failed.resource_name}`,
-        errorMessage: failed.error_message,
-        finishedAt: null,
-      })
-      return
-    }
-
-    if (running) {
-      update({
-        expId,
-        status: "running",
-        stage: "local_downloading",
-        message: `Preparing local resources (${done}/${rows.length} finished)`,
-        errorMessage: null,
-        finishedAt: null,
-      })
-      return
-    }
-
-    update({
-      expId,
-      status: "running",
-      stage: "local_downloading",
-      message: "Local downloads finished, waiting for experiment resume",
-      errorMessage: null,
-      finishedAt: null,
-    })
   }
 
   export function title(expId: string) {

@@ -7,6 +7,9 @@ export { WorkflowInstanceTable } from "../workflow/workflow.sql"
 export {
   ResearchProjectTable,
   ExperimentTable,
+  ExperimentWatchTable,
+  ExperimentExecutionWatchTable,
+  RemoteTaskTable,
   AtomTable,
   AtomRelationTable,
   ArticleTable,

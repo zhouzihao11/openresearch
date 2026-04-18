@@ -18,9 +18,7 @@ import PROMPT_RESEARCH_PROJECT_INIT from "./prompt/research_project_init.txt"
 import PROMPT_EXPERIMENT from "./prompt/experiment.txt"
 import PROMPT_EXPERIMENT_COMMIT from "./prompt/experiment_commit.txt"
 import PROMPT_EXPERIMENT_PLAN from "./prompt/experiment_plan.txt"
-import PROMPT_EXPERIMENT_LOCAL_DOWNLOAD from "./prompt/experiment_local_download.txt"
 import PROMPT_EXPERIMENT_REMOTE_DOWNLOAD from "./prompt/experiment_remote_download.txt"
-import PROMPT_EXPERIMENT_SYNC_RESOURCE from "./prompt/experiment_sync_resource.txt"
 import PROMPT_EXPERIMENT_DEPLOY from "./prompt/experiment_deploy.txt"
 import PROMPT_EXPERIMENT_SETUP_ENV from "./prompt/experiment_setup_env.txt"
 import PROMPT_EXPERIMENT_RUN from "./prompt/experiment_run.txt"
@@ -117,6 +115,8 @@ export namespace Agent {
           PermissionNext.fromConfig({
             question: "allow",
             plan_enter: "allow",
+            experiment_remote_task_start: "allow",
+            experiment_remote_task_get: "allow",
           }),
           user,
         ),
@@ -133,6 +133,7 @@ export namespace Agent {
           defaults,
           PermissionNext.fromConfig({
             question: "allow",
+            experiment_remote_task_get: "allow",
           }),
           user,
         ),
@@ -144,33 +145,12 @@ export namespace Agent {
         name: "experiment_deploy",
         description: "Experiment deploy agent. Syncs code to a remote server.",
         options: {},
-        permission: PermissionNext.merge(defaults, PermissionNext.fromConfig({}), user),
-        prompt: PROMPT_EXPERIMENT_DEPLOY,
-        mode: "subagent",
-        native: true,
-      },
-      experiment_local_download: {
-        name: "experiment_local_download",
-        description:
-          "Experiment local download agent. Prepares datasets or artifacts locally in a reusable download-only environment.",
-        options: {},
         permission: PermissionNext.merge(
           defaults,
-          PermissionNext.fromConfig({
-            "*": "deny",
-            bash: "allow",
-            read: "allow",
-            question: "allow",
-            huggingface_search: "allow",
-            modelscope_search: "allow",
-            experiment_resource_job_start: "allow",
-            experiment_local_download_watch_init: "allow",
-            experiment_local_download_watch_update: "allow",
-            experiment_local_download_watch_refresh: "allow",
-          }),
+          PermissionNext.fromConfig({ experiment_remote_task_get: "allow" }),
           user,
         ),
-        prompt: PROMPT_EXPERIMENT_LOCAL_DOWNLOAD,
+        prompt: PROMPT_EXPERIMENT_DEPLOY,
         mode: "subagent",
         native: true,
       },
@@ -186,31 +166,14 @@ export namespace Agent {
             ssh: "allow",
             read: "allow",
             question: "allow",
+            huggingface_search: "allow",
+            modelscope_search: "allow",
+            experiment_remote_task_start: "allow",
+            experiment_remote_task_get: "allow",
           }),
           user,
         ),
         prompt: PROMPT_EXPERIMENT_REMOTE_DOWNLOAD,
-        mode: "subagent",
-        native: true,
-      },
-      experiment_sync_resource: {
-        name: "experiment_sync_resource",
-        description:
-          "Experiment resource sync agent. Syncs locally prepared resources to the remote server and verifies the final paths.",
-        options: {},
-        permission: PermissionNext.merge(
-          defaults,
-          PermissionNext.fromConfig({
-            "*": "deny",
-            bash: "allow",
-            ssh: "allow",
-            read: "allow",
-            question: "allow",
-            experiment_resource_job_start: "allow",
-          }),
-          user,
-        ),
-        prompt: PROMPT_EXPERIMENT_SYNC_RESOURCE,
         mode: "subagent",
         native: true,
       },
@@ -219,7 +182,11 @@ export namespace Agent {
         description:
           "Experiment setup environment agent. Checks existing conda environments on the remote server, reuses or creates one as needed, and installs dependencies.",
         options: {},
-        permission: PermissionNext.merge(defaults, PermissionNext.fromConfig({}), user),
+        permission: PermissionNext.merge(
+          defaults,
+          PermissionNext.fromConfig({ experiment_remote_task_get: "allow" }),
+          user,
+        ),
         prompt: PROMPT_EXPERIMENT_SETUP_ENV,
         mode: "subagent",
         native: true,
@@ -227,9 +194,16 @@ export namespace Agent {
       experiment_run: {
         name: "experiment_run",
         description:
-          "Experiment run agent. Launches the experiment on a remote server via nohup and monitors its startup.",
+          "Experiment run agent. Launches the experiment on a remote server via remote task tooling and monitors its startup.",
         options: {},
-        permission: PermissionNext.merge(defaults, PermissionNext.fromConfig({}), user),
+        permission: PermissionNext.merge(
+          defaults,
+          PermissionNext.fromConfig({
+            experiment_remote_task_start: "allow",
+            experiment_remote_task_get: "allow",
+          }),
+          user,
+        ),
         prompt: PROMPT_EXPERIMENT_RUN,
         mode: "subagent",
         native: true,

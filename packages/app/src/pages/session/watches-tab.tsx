@@ -1,9 +1,13 @@
-import { createSignal, For, Match, onMount, Show, Switch } from "solid-js"
+import { createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js"
 import { useNavigate } from "@solidjs/router"
+import { Dialog } from "@opencode-ai/ui/dialog"
+import { useDialog } from "@opencode-ai/ui/context/dialog"
+import { showToast } from "@opencode-ai/ui/toast"
 import { base64Encode } from "@opencode-ai/util/encode"
 import { useSDK } from "@/context/sdk"
+import { RemoteTaskPanel } from "@/pages/session/remote-task-panel"
 
-interface WatchRow {
+export interface WatchRow {
   watch_id: string
   kind: "experiment"
   exp_id: string
@@ -13,18 +17,19 @@ interface WatchRow {
   wandb_entity: string | null
   wandb_project: string | null
   wandb_run_id: string | null
-  local_download_resource_name: string | null
-  local_download_local_path: string | null
-  local_download_log_path: string | null
-  local_download_status_path: string | null
+  remote_task_title: string | null
+  remote_task_kind: "resource_download" | "experiment_run" | null
+  remote_task_status: "pending" | "running" | "finished" | "failed" | "canceled" | null
+  remote_task_target_path: string | null
+  remote_task_screen_name: string | null
+  remote_task_log_path: string | null
+  remote_task_error_message: string | null
   status: "pending" | "running" | "finished" | "failed" | "canceled"
   stage:
     | "planning"
     | "coding"
     | "deploying_code"
     | "setting_up_env"
-    | "local_downloading"
-    | "syncing_resources"
     | "remote_downloading"
     | "verifying_resources"
     | "running_experiment"
@@ -60,9 +65,20 @@ function formatTime(ts: number | null) {
   return new Date(ts).toLocaleString()
 }
 
+function watchNotice(watch: WatchRow) {
+  if (watch.stage === "watching_wandb") {
+    if (watch.status === "finished") return "W&B run finished"
+    if (watch.status === "failed") return "W&B run failed"
+    return "Watching W&B run"
+  }
+  if (watch.status === "failed") return "Experiment failed"
+  if (watch.status === "finished") return "Experiment finished"
+}
+
 export function WatchesTab(props: { onOpenFile?: (filePath: string) => void }) {
   const sdk = useSDK()
   const navigate = useNavigate()
+  const dialog = useDialog()
   const [watches, setWatches] = createSignal<WatchRow[]>([])
   const [loading, setLoading] = createSignal(true)
   const [error, setError] = createSignal(false)
@@ -74,7 +90,7 @@ export function WatchesTab(props: { onOpenFile?: (filePath: string) => void }) {
       setError(false)
       const res = await sdk.client.research.experimentWatch.list()
       if (res.data) {
-        setWatches(res.data as WatchRow[])
+        setWatches(res.data as unknown as WatchRow[])
       }
     } catch {
       setError(true)
@@ -85,6 +101,8 @@ export function WatchesTab(props: { onOpenFile?: (filePath: string) => void }) {
 
   onMount(() => {
     fetchWatches()
+    const timer = window.setInterval(fetchWatches, 10000)
+    onCleanup(() => window.clearInterval(timer))
   })
 
   const goToSession = async (expId: string) => {
@@ -103,13 +121,40 @@ export function WatchesTab(props: { onOpenFile?: (filePath: string) => void }) {
     props.onOpenFile?.(filePath)
   }
 
-  const syncWatch = async (watchId: string) => {
+  const openLog = async (watch: WatchRow) => {
+    try {
+      const encodedDirectory = /[^\x00-\x7F]/.test(sdk.directory) ? encodeURIComponent(sdk.directory) : sdk.directory
+      const res = await fetch(`${sdk.url}/research/experiment-watch/${watch.watch_id}/log`, {
+        headers: {
+          "x-opencode-directory": encodedDirectory,
+        },
+      })
+      if (!res.ok) throw new Error(await res.text())
+      const log = (await res.json()) as { ok: boolean; path: string; content: string }
+      if (!log) return
+      dialog.show(() => <DialogRemoteLog title={watch.title} path={log.path} content={log.content} />)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to load remote log"
+      showToast({ title: "Failed to load remote log", description: message })
+    }
+  }
+
+  const refreshWatch = async (watchId: string, mode: "wandb" | "remote-task") => {
     try {
       setSyncing((prev) => ({ ...prev, [watchId]: true }))
-      await sdk.client.research.experimentWatch.refresh({ watchId })
+      const encodedDirectory = /[^\x00-\x7F]/.test(sdk.directory) ? encodeURIComponent(sdk.directory) : sdk.directory
+      const suffix = mode === "wandb" ? "refresh-wandb" : "refresh-remote-task"
+      const res = await fetch(`${sdk.url}/research/experiment-watch/${watchId}/${suffix}`, {
+        method: "POST",
+        headers: {
+          "x-opencode-directory": encodedDirectory,
+        },
+      })
+      if (!res.ok) throw new Error(await res.text())
       await fetchWatches()
-    } catch {
-      // ignore
+    } catch (err) {
+      const message = err instanceof Error ? err.message : `Failed to refresh ${mode}`
+      showToast({ title: `Failed to refresh ${mode}`, description: message })
     } finally {
       setSyncing((prev) => ({ ...prev, [watchId]: false }))
     }
@@ -124,10 +169,10 @@ export function WatchesTab(props: { onOpenFile?: (filePath: string) => void }) {
     }
   }
 
-  const canManualPoll = (watch: WatchRow) => watch.stage === "local_downloading"
+  const hasRemoteTask = (watch: WatchRow) =>
+    !!watch.remote_task_log_path || !!watch.remote_task_target_path || !!watch.remote_task_screen_name
 
-  const hasLocalArtifacts = (watch: WatchRow) =>
-    !!watch.local_download_log_path || !!watch.local_download_status_path || !!watch.local_download_local_path
+  const showRemoteTask = (watch: WatchRow) => hasRemoteTask(watch)
 
   const canSyncWandb = (watch: WatchRow) =>
     watch.stage === "watching_wandb" && !!watch.wandb_entity && !!watch.wandb_project && !!watch.wandb_run_id
@@ -184,21 +229,24 @@ export function WatchesTab(props: { onOpenFile?: (filePath: string) => void }) {
                     <Show when={watch.message}>
                       <span>{watch.message}</span>
                     </Show>
-                    <Show when={watch.stage === "local_downloading" && hasLocalArtifacts(watch)}>
+                    <Show when={watchNotice(watch)}>
+                      {(text) => <div class={`text-11-regular mt-1 ${statusColor(watch.status)}`}>{text()}</div>}
+                    </Show>
+                    <Show when={watch.stage === "watching_wandb" && watch.wandb_run_id}>
                       <div class="flex flex-col gap-1 text-11-regular text-text-weak mt-1">
-                        <Show when={watch.local_download_resource_name}>
-                          <span>Resource: {watch.local_download_resource_name}</span>
-                        </Show>
-                        <Show when={watch.local_download_local_path}>
-                          <span class="font-mono break-all">Local: {watch.local_download_local_path}</span>
-                        </Show>
-                        <Show when={watch.local_download_log_path}>
-                          <span class="font-mono break-all">Log: {watch.local_download_log_path}</span>
-                        </Show>
-                        <Show when={watch.local_download_status_path}>
-                          <span class="font-mono break-all">Status: {watch.local_download_status_path}</span>
-                        </Show>
+                        <span>
+                          W&B: {watch.wandb_entity}/{watch.wandb_project}
+                        </span>
+                        <span class="font-mono break-all">Run: {watch.wandb_run_id}</span>
                       </div>
+                    </Show>
+                    <Show when={showRemoteTask(watch)}>
+                      <RemoteTaskPanel
+                        watch={watch}
+                        syncing={!!syncing()[watch.watch_id]}
+                        onRefresh={() => refreshWatch(watch.watch_id, "remote-task")}
+                        onOpenLog={() => openLog(watch)}
+                      />
                     </Show>
                     <div class="flex gap-3 text-11-regular text-text-weak">
                       <span>Created: {formatTime(watch.time_created)}</span>
@@ -229,7 +277,14 @@ export function WatchesTab(props: { onOpenFile?: (filePath: string) => void }) {
                           Config
                         </button>
                       </Show>
-                      <Show when={watch.wandb_entity && watch.wandb_project && watch.wandb_run_id}>
+                      <Show
+                        when={
+                          watch.stage === "watching_wandb" &&
+                          watch.wandb_entity &&
+                          watch.wandb_project &&
+                          watch.wandb_run_id
+                        }
+                      >
                         <button
                           class="px-2 py-0.5 rounded text-11-regular bg-background-stronger text-text-base hover:text-text-strong transition-colors"
                           onClick={(e) => {
@@ -243,47 +298,13 @@ export function WatchesTab(props: { onOpenFile?: (filePath: string) => void }) {
                           W&B
                         </button>
                       </Show>
-                      <Show when={canManualPoll(watch)}>
-                        <Show when={watch.local_download_log_path}>
-                          <button
-                            class="px-2 py-0.5 rounded text-11-regular bg-background-stronger text-text-base hover:text-text-strong transition-colors"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              watch.local_download_log_path && openFile(watch.local_download_log_path)
-                            }}
-                          >
-                            Log
-                          </button>
-                        </Show>
-                        <Show when={watch.local_download_status_path}>
-                          <button
-                            class="px-2 py-0.5 rounded text-11-regular bg-background-stronger text-text-base hover:text-text-strong transition-colors"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              watch.local_download_status_path && openFile(watch.local_download_status_path)
-                            }}
-                          >
-                            Status
-                          </button>
-                        </Show>
-                        <button
-                          class="px-2 py-0.5 rounded text-11-regular bg-background-stronger text-text-base hover:text-text-strong transition-colors disabled:opacity-50"
-                          disabled={syncing()[watch.watch_id]}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            syncWatch(watch.watch_id)
-                          }}
-                        >
-                          {syncing()[watch.watch_id] ? "Polling..." : "Poll"}
-                        </button>
-                      </Show>
                       <Show when={canSyncWandb(watch)}>
                         <button
                           class="px-2 py-0.5 rounded text-11-regular bg-background-stronger text-text-base hover:text-text-strong transition-colors disabled:opacity-50"
                           disabled={syncing()[watch.watch_id]}
                           onClick={(e) => {
                             e.stopPropagation()
-                            syncWatch(watch.watch_id)
+                            refreshWatch(watch.watch_id, "wandb")
                           }}
                         >
                           {syncing()[watch.watch_id] ? "Syncing..." : "Sync"}
@@ -307,5 +328,18 @@ export function WatchesTab(props: { onOpenFile?: (filePath: string) => void }) {
         </Switch>
       </div>
     </div>
+  )
+}
+
+function DialogRemoteLog(props: { title: string; path: string; content: string }) {
+  return (
+    <Dialog title={`Remote Log: ${props.title}`} class="w-full max-w-3xl mx-auto">
+      <div class="flex flex-col gap-2 min-h-0">
+        <div class="text-11-regular text-text-weak font-mono break-all">{props.path}</div>
+        <pre class="max-h-[70vh] overflow-auto rounded-md bg-background-stronger p-3 text-11-regular text-text-base whitespace-pre-wrap break-words font-mono">
+          {props.content || "(empty log)"}
+        </pre>
+      </div>
+    </Dialog>
   )
 }

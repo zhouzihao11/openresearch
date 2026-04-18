@@ -48,14 +48,9 @@ import { ResearchInfoTool } from "./research-info"
 import { SshTool } from "./ssh"
 import { ExperimentWatchTool } from "./experiment-watch"
 import { ExperimentExecutionWatchInitTool, ExperimentExecutionWatchUpdateTool } from "./experiment-execution-watch"
-import { ExperimentResourceJobStartTool } from "./experiment-resource-job"
+import { ExperimentRemoteTaskGetTool, ExperimentRemoteTaskStartTool } from "./experiment-remote-task"
 import { ConvertTool } from "./convert"
 import { WorkflowTool } from "./workflow"
-import {
-  ExperimentLocalDownloadWatchInitTool,
-  ExperimentLocalDownloadWatchRefreshTool,
-  ExperimentLocalDownloadWatchUpdateTool,
-} from "./experiment-local-download-watch"
 import { Glob } from "../util/glob"
 import { pathToFileURL } from "url"
 
@@ -167,10 +162,8 @@ export namespace ToolRegistry {
       ExperimentWatchTool,
       ExperimentExecutionWatchInitTool,
       ExperimentExecutionWatchUpdateTool,
-      ExperimentResourceJobStartTool,
-      ExperimentLocalDownloadWatchInitTool,
-      ExperimentLocalDownloadWatchUpdateTool,
-      ExperimentLocalDownloadWatchRefreshTool,
+      ExperimentRemoteTaskStartTool,
+      ExperimentRemoteTaskGetTool,
       ConvertTool,
       WorkflowTool,
       ...(Flag.OPENCODE_EXPERIMENTAL_LSP_TOOL ? [LspTool] : []),

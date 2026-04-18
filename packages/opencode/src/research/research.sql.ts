@@ -117,13 +117,12 @@ const executionStages = [
   "coding",
   "deploying_code",
   "setting_up_env",
-  "local_downloading",
-  "syncing_resources",
   "remote_downloading",
   "verifying_resources",
   "running_experiment",
   "watching_wandb",
 ] as const
+const remoteTaskKinds = ["resource_download", "experiment_run"] as const
 export const ExperimentWatchTable = sqliteTable(
   "experiment_watch",
   {
@@ -172,32 +171,35 @@ export const ExperimentExecutionWatchTable = sqliteTable(
   ],
 )
 
-export const LocalDownloadWatchTable = sqliteTable(
-  "local_download_watch",
+export const RemoteTaskTable = sqliteTable(
+  "remote_task",
   {
-    watch_id: text().primaryKey(),
+    task_id: text().primaryKey(),
     exp_id: text()
       .notNull()
       .references(() => ExperimentTable.exp_id, { onDelete: "cascade" }),
-    resource_key: text().notNull(),
-    resource_name: text().notNull(),
-    resource_type: text(),
+    kind: text().$type<(typeof remoteTaskKinds)[number]>().notNull(),
+    resource_key: text(),
+    title: text().notNull(),
     status: text().$type<(typeof watchStatuses)[number]>().notNull().default("pending"),
-    local_resource_root: text(),
-    local_path: text(),
+    server: text().notNull(),
+    remote_root: text().notNull(),
+    target_path: text(),
+    screen_name: text().notNull(),
+    command: text().notNull(),
     pid: integer(),
     log_path: text(),
-    status_path: text(),
     source_selection: text(),
     method: text(),
     error_message: text(),
     last_polled_at: integer(),
+    stopped_at: integer(),
     ...Timestamps,
   },
   (table) => [
-    index("local_download_watch_exp_idx").on(table.exp_id),
-    index("local_download_watch_status_idx").on(table.status),
-    uniqueIndex("local_download_watch_exp_resource_idx").on(table.exp_id, table.resource_key),
+    index("remote_task_exp_idx").on(table.exp_id),
+    index("remote_task_status_idx").on(table.status),
+    uniqueIndex("remote_task_exp_kind_resource_idx").on(table.exp_id, table.kind, table.resource_key),
   ],
 )
 

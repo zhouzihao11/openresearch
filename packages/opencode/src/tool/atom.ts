@@ -8,7 +8,7 @@ import {
   ExperimentTable,
   ExperimentExecutionWatchTable,
   ExperimentWatchTable,
-  LocalDownloadWatchTable,
+  RemoteTaskTable,
 } from "../research/research.sql"
 import { Research } from "../research/research"
 import { Bus } from "@/bus"
@@ -246,7 +246,9 @@ export const AtomQueryTool = Tool.define("atom_query", {
     const atoms = Database.use((db) =>
       db.select().from(AtomTable).where(eq(AtomTable.research_project_id, researchProjectId)).all(),
     )
-    const items = params.articleIds?.length ? atoms.filter((atom) => atom.article_id && params.articleIds?.includes(atom.article_id)) : atoms
+    const items = params.articleIds?.length
+      ? atoms.filter((atom) => atom.article_id && params.articleIds?.includes(atom.article_id))
+      : atoms
 
     if (items.length === 0) {
       return {
@@ -566,9 +568,7 @@ export const AtomDeleteTool = Tool.define("atom_delete", {
       for (const exp of experiments) {
         // Delete experiment watchers
         Database.use((db) => db.delete(ExperimentWatchTable).where(eq(ExperimentWatchTable.exp_id, exp.exp_id)).run())
-        Database.use((db) =>
-          db.delete(LocalDownloadWatchTable).where(eq(LocalDownloadWatchTable.exp_id, exp.exp_id)).run(),
-        )
+        Database.use((db) => db.delete(RemoteTaskTable).where(eq(RemoteTaskTable.exp_id, exp.exp_id)).run())
         Database.use((db) =>
           db.delete(ExperimentExecutionWatchTable).where(eq(ExperimentExecutionWatchTable.exp_id, exp.exp_id)).run(),
         )

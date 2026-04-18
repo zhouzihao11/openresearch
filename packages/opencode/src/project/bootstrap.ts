@@ -13,7 +13,7 @@ import { ShareNext } from "@/share/share-next"
 import { Snapshot } from "../snapshot"
 import { Truncate } from "../tool/truncation"
 import { ExperimentWatcher } from "../research/experiment-watcher"
-import { ExperimentLocalDownloadWatcher } from "../research/experiment-local-download-watcher"
+import { ExperimentRemoteTaskWatcher } from "../research/experiment-remote-task-watcher"
 
 export async function InstanceBootstrap() {
   Log.Default.info("bootstrapping", { directory: Instance.directory })
@@ -27,7 +27,7 @@ export async function InstanceBootstrap() {
   Snapshot.init()
   Truncate.init()
   ExperimentWatcher.init()
-  ExperimentLocalDownloadWatcher.init()
+  ExperimentRemoteTaskWatcher.init()
 
   Bus.subscribe(Command.Event.Executed, async (payload) => {
     if (payload.properties.name === Command.Default.INIT) {
