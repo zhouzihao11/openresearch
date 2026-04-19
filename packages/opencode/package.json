@@ -111,6 +111,8 @@
     "fuzzysort": "3.1.0",
     "glob": "13.0.5",
     "google-auth-library": "10.5.0",
+    "graphology": "0.26.0",
+    "graphology-communities-louvain": "2.0.2",
     "gray-matter": "4.0.3",
     "hono": "catalog:",
     "hono-openapi": "catalog:",

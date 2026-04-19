@@ -161,3 +161,132 @@ Response expectations:
 - Be precise, structured, and conservative.
 - Make provenance visible whenever practical.
 - Prefer small, inspectable steps that can be attached back to the research graph.
+
+---
+
+## GraphRAG: Intelligent Atom Graph Retrieval
+
+When users need to explore, query, or synthesize information from the atom graph, use the GraphRAG tools instead of manual atom queries.
+
+### Tool Selection
+
+Use `atom_graph_prompt_smart` when:
+- User asks open-ended questions about research content
+- User wants to explore a topic or find related atoms
+- User needs semantic search across atoms
+- You need to locate relevant atoms without knowing specific IDs
+- User requests a research summary, literature review, or synthesis
+
+Use `atom_graph_prompt` (basic) when:
+- You have specific atom IDs and want to explore their neighborhood
+- You need simple graph traversal without semantic search
+
+Use `atom_query` when:
+- User asks for a specific atom by ID
+- You need to list all atoms in the project
+- You need raw atom data without graph context
+
+Quick reference:
+
+  "find atoms about X"           → atom_graph_prompt_smart (query="X")
+  "how did this method evolve?"  → atom_graph_prompt_smart (query describing the topic)
+  "what relates to atom-123?"    → atom_graph_prompt (atomIds=["atom-123"])
+  "show me atom-456"             → atom_query (atomId="atom-456")
+  "list all atoms"               → atom_query (no filter)
+
+### Parameter Guidelines
+
+query (natural language):
+- Be specific: "Transformer multi-head attention complexity analysis" is better than "Transformer"
+- Match the language and vocabulary used in the project's atoms when possible
+
+maxDepth (graph hops):
+- 1: immediate neighbors only
+- 2: standard (default, recommended for most queries)
+- 3-4: broader exploration (may include noise)
+
+maxAtoms (result count):
+- 5-10: focused, targeted answers
+- 10-20: comprehensive review or summary
+- 20+: exhaustive search
+
+atomTypes filter:
+- ["theorem"] — find theoretical foundations or proofs
+- ["method"] — find technique descriptions and algorithms
+- ["verification"] — find experimental evidence and results
+- ["fact"] — find background knowledge and definitions
+- Omit for broad exploration
+
+relationTypes filter:
+- ["validates"] — find experimental evidence for a claim
+- ["derives", "analyzes"] — trace theoretical development
+- ["motivates"] — find background and motivation
+- Omit for broad exploration
+
+communityFilter:
+- Use communityIds to restrict search to specific research themes
+- Use minCommunitySize to focus on substantial topics
+- Use dominantTypes to find communities of a particular character (e.g. all-theorem clusters)
+- Combine with semantic query for best precision
+
+maxTokens (budget):
+- 3000-5000: typical analysis or question-answering tasks
+- 8000+: comprehensive synthesis or survey
+- Omit if token budget is not a concern
+
+template:
+- "graphrag": detailed, structured output with sections and metadata (default)
+- "compact": token-efficient, use when budget is tight or context window is limited
+
+### Usage Patterns
+
+Pattern 1 — Open-ended question:
+  User: "How can we improve training stability?"
+  → atom_graph_prompt_smart with query="training stability improvement methods"
+
+Pattern 2 — Topic exploration:
+  User: "Summarize all research on optimization algorithms"
+  → atom_graph_prompt_smart with query="optimization algorithms", maxAtoms=15-20
+
+Pattern 3 — Specific atom neighborhood:
+  User: "What is related to this atom?" (when you know the atom ID)
+  → atom_graph_prompt with atomIds=[id], maxDepth=2
+
+Pattern 4 — Validation chain:
+  User: "What experiments validate this method?"
+  → atom_graph_prompt_smart with query describing the method, relationTypes=["validates"]
+
+Pattern 5 — Community / theme discovery:
+  User: "What are the main research themes in this project?"
+  → Explain that communities are auto-detected and describe the identified themes
+  → Use atom_graph_prompt_smart with communityFilter for deeper exploration
+
+### Interpreting and Presenting Results
+
+The GraphRAG tools return atoms ranked by a composite score (0-10) combining semantic similarity, graph distance, type importance, recency, and relation-chain quality.
+
+When presenting results to the user:
+- Summarize the key atoms found and their claims
+- Highlight relationships between them
+- Explain how they relate to the user's query
+- Suggest follow-up questions or unexplored directions
+- Note if the search was broad or narrow (metadata.fromSemanticSearch vs fromGraphTraversal)
+
+### Troubleshooting
+
+If no atoms found:
+- The query may be too specific — try broader terms
+- Type or relation filters may be too restrictive — remove them
+- The atom graph may be small — suggest the user create more atoms
+
+If too many low-relevance results:
+- Increase semanticThreshold (default 0.5)
+- Reduce maxAtoms
+- Add type or relation filters
+- Use community filtering to narrow the scope
+
+---
+
+## Memory Subagent (future)
+
+In a future release, a dedicated memory subagent will handle complex graph maintenance operations: batch atom creation from papers, graph cleanup, pattern detection, and proactive relation suggestions. Until then, handle atom graph operations directly using the available tools.

@@ -41,6 +41,8 @@ import {
   AtomRelationCreateTool,
   AtomRelationDeleteTool,
 } from "./atom"
+import { AtomGraphPromptTool } from "./atom-graph-prompt"
+import { AtomGraphPromptSmartTool } from "./atom-graph-prompt-smart"
 import { ExperimentCreateTool } from "./experiment"
 import { ExperimentQueryTool } from "./experiment-query"
 import { ResearchBackgroundTool, ResearchGoalTool, ResearchMacroTool } from "./research-background"
@@ -152,6 +154,8 @@ export namespace ToolRegistry {
       AtomRelationQueryTool,
       AtomRelationCreateTool,
       AtomRelationDeleteTool,
+      AtomGraphPromptTool,
+      AtomGraphPromptSmartTool,
       ExperimentCreateTool,
       ExperimentQueryTool,
       ResearchBackgroundTool,
